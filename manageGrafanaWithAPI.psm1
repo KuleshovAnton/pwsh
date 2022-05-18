@@ -48,7 +48,7 @@ function Get-GrafTeams {
 }
 
 ##Get Team members.
-function Get-GrafTeamsMembers {
+function Get-GrafTeamMembers {
     <#
     .SYNOPSIS
         Grafana Function Get Teams members. 
@@ -68,7 +68,7 @@ function Get-GrafTeamsMembers {
 }
 
 #Add a user to the Team.
-function Add-GrafTeamsMembers {
+function Add-GrafTeamMembers {
     <#
     .SYNOPSIS
         Grafana Function Add a user to the Team.
@@ -185,4 +185,4 @@ function Get-GrafUserTeams {
     return $result = Invoke-RestMethod @datasourceParameters 
 }
 
-Export-ModuleMember -Function Get-GrafTeams,Get-GrafTeamsMembers,Add-GrafTeamsMembers,Get-GrafUsers,Get-GrafUser,Get-GrafUserTeams
+Export-ModuleMember -Function Get-GrafTeams,Get-GrafTeamMembers,Add-GrafTeamMembers,Create-GrafTeam,Get-GrafUsers,Get-GrafUser,Get-GrafUserTeams
