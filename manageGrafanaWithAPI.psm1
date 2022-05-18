@@ -90,6 +90,34 @@ function Add-GrafTeamsMembers {
     return $arr = @(New-Object PSObject -Property @{"userId"=$userId; "message"=$result; "teamId"=$teamId})
 }
 
+#Create Team.
+function Create-GrafTeam {
+     <#
+    .SYNOPSIS
+        Grafana Function Create Team.
+    .EXAMPLE
+        Add-GrafTeamsMembers -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -NameTeam Name_Team -EmailTeam Email_Team -OrgId Org_Id
+    #>
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url,
+        [parameter(Mandatory=$true,position=3)]$NameTeam,
+        [parameter(Mandatory=$false,position=4)]$EmailTeam,
+        [parameter(Mandatory=$true,position=5)]$OrgId
+        )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+    $createDatasourceUri = "$Url/api/teams"
+    $body = @{
+        "name"= $NameTeam;
+        "email"= "$EmailTeam";
+        "orgId"= $orgId 
+    }
+    $bodyJson = (ConvertTo-Json $body) -replace "\s\s+"
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "POST" -URI $createDatasourceUri -Credential $credential
+    return $result = Invoke-RestMethod @datasourceParameters -Body $bodyJson
+}
+
 ###USER
 #Get all users.
 function Get-GrafUsers {
