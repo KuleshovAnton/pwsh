@@ -180,6 +180,7 @@ function Get-GrafUserTeams {
         [parameter(Mandatory=$true,position=2)]$Url,
         [parameter(Mandatory=$true,position=3)]$userId
         )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
     $createDatasourceUri = "$Url/api/users/$userId/teams"
     $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
     return $result = Invoke-RestMethod @datasourceParameters 
