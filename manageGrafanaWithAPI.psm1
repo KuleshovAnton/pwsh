@@ -1,4 +1,20 @@
-﻿function Convert-GrafCredential{
+#!/bin/pwsh
+
+#OS Platform
+function GetOS {
+    if ( $PSVersionTable.PSVersion.Major -le "5" ) {   
+        return $Platform = "Win32NT"
+        }
+    elseif ( $PSVersionTable.PSVersion.Major -ge "6" -and $PSVersionTable.Platform -eq "Win32NT" ) {
+        return $Platform = "Win32NT"
+        }
+    elseif ( $PSVersionTable.PSVersion.Major -ge "6" -and $PSVersionTable.Platform -eq "Unix" ) {
+        return $Platform = "Unix"
+        }
+}
+
+#Credential
+function Convert-GrafCredential{
     <#
     .SYNOPSIS
         Function for converting plain text authentication informations to base 64
@@ -12,6 +28,7 @@
     return [Convert]::ToBase64String( [Text.Encoding]::ASCII.GetBytes(( "{0}:{1}" -f $login,$password) ) )
 }
 
+#DatasourceParameters
 function Create-GrafDatasourceParameters {
     param(
         [parameter(Mandatory=$true,position=0)]$Method,
@@ -44,7 +61,10 @@ function Get-GrafTeams {
     $credential = Convert-GrafCredential -Login $Login -Password $Password
     $createDatasourceUri = "$Url/api/teams/search?"
     $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
-    return $result = (Invoke-RestMethod @datasourceParameters).teams
+    Switch (GetOS){
+        Win32NT { return (Invoke-RestMethod @datasourceParameters).teams }
+        Unix { return (Invoke-RestMethod @datasourceParameters -SkipCertificateCheck).teams }
+        }
 }
 
 ##Get Team members.
@@ -64,7 +84,10 @@ function Get-GrafTeamMembers {
     $credential = Convert-GrafCredential -Login $Login -Password $Password
     $createDatasourceUri = "$Url/api/teams/$teamId/members"
     $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
-    return $result = Invoke-RestMethod @datasourceParameters
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters }
+        Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
+        }
 }
 
 #Add a user to the Team.
@@ -86,13 +109,16 @@ function Add-GrafTeamMembers {
     $createDatasourceUri = "$Url/api/teams/$teamId/members"
     $datasourceParameters = Create-GrafDatasourceParameters -Method "POST" -URI $createDatasourceUri -Credential $credential
     $body = ("{"+"""userId"""+":"+ $userId +"}")
-    $result = (Invoke-RestMethod @datasourceParameters -Body $body).message 
-    return $arr = @(New-Object PSObject -Property @{"userId"=$userId; "message"=$result; "teamId"=$teamId})
+    Switch (GetOS){
+        Win32NT { $result = (Invoke-RestMethod @datasourceParameters -Body $body) }
+        Unix { $result = (Invoke-RestMethod @datasourceParameters -Body $body -SkipCertificateChec) }
+        }
+    return $arr = @(New-Object PSObject -Property @{"userId"=$userId; "message"=$result.message; "teamId"=$teamId})
 }
 
 #Create Team.
-function Create-GrafTeam {
-     <#
+function New-GrafTeam {
+        <#
     .SYNOPSIS
         Grafana Function Create Team.
     .EXAMPLE
@@ -115,7 +141,10 @@ function Create-GrafTeam {
     }
     $bodyJson = (ConvertTo-Json $body) -replace "\s\s+"
     $datasourceParameters = Create-GrafDatasourceParameters -Method "POST" -URI $createDatasourceUri -Credential $credential
-    return $result = Invoke-RestMethod @datasourceParameters -Body $bodyJson
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters -Body $bodyJson }
+        Unix { return Invoke-RestMethod @datasourceParameters -Body $bodyJson -SkipCertificateCheck }
+        }
 }
 
 ###USER
@@ -135,7 +164,10 @@ function Get-GrafUsers {
     $credential = Convert-GrafCredential -Login $Login -Password $Password
     $createDatasourceUri = "$Url/api/users"
     $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
-    return $result = Invoke-RestMethod @datasourceParameters 
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters }
+        Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
+        }
 }
 
 #Get user using Id or login/email.
@@ -163,7 +195,10 @@ function Get-GrafUser {
         $createDatasourceUri = "$Url/api/users/lookup?loginOrEmail=$userLoginOrEmail"
         }
     $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
-    return $result = Invoke-RestMethod @datasourceParameters 
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters }
+        Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
+        }
 }
 
 #Get which groups the user is in.
@@ -182,8 +217,17 @@ function Get-GrafUserTeams {
         )
     $credential = Convert-GrafCredential -Login $Login -Password $Password
     $createDatasourceUri = "$Url/api/users/$userId/teams"
-    $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
-    return $result = Invoke-RestMethod @datasourceParameters 
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential 
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters }
+        Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
+        }
 }
 
-Export-ModuleMember -Function Get-GrafTeams,Get-GrafTeamMembers,Add-GrafTeamMembers,Create-GrafTeam,Get-GrafUsers,Get-GrafUser,Get-GrafUserTeams
+Export-ModuleMember -Function Get-GrafTeams,`
+Get-GrafTeamMembers,`
+Add-GrafTeamMembers,`
+New-GrafTeam,`
+Get-GrafUsers,`
+Get-GrafUser,`
+Get-GrafUserTeams
