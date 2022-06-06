@@ -224,10 +224,4 @@ function Get-GrafUserTeams {
         }
 }
 
-Export-ModuleMember -Function Get-GrafTeams,`
-Get-GrafTeamMembers,`
-Add-GrafTeamMembers,`
-New-GrafTeam,`
-Get-GrafUsers,`
-Get-GrafUser,`
-Get-GrafUserTeams
+Export-ModuleMember -Function Get-GrafTeams, Get-GrafTeamMembers, Add-GrafTeamMembers, New-GrafTeam, Get-GrafUsers, Get-GrafUser, Get-GrafUserTeams
