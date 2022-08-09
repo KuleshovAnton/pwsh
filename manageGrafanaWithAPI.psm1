@@ -1,5 +1,6 @@
 #!/bin/pwsh
 
+#Version 1.0.0.4
 #OS Platform
 function GetOS {
     if ( $PSVersionTable.PSVersion.Major -le "5" ) {   
@@ -224,4 +225,104 @@ function Get-GrafUserTeams {
         }
 }
 
-Export-ModuleMember -Function Get-GrafTeams, Get-GrafTeamMembers, Add-GrafTeamMembers, New-GrafTeam, Get-GrafUsers, Get-GrafUser, Get-GrafUserTeams
+###DASHBOARD
+#Get Folders And Dashboards.
+function Get-GrafFoldersAndDashboards {
+	<#
+    .SYNOPSIS
+        Grafana Function Get Folders And Dashboards.
+    .EXAMPLE
+        Get-GrafFoldersAndDashboards -Login foo -Password foo -Url "http://_IP_or_DNS_:Port"
+    #>
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url
+        )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+    $createDatasourceUri = "$Url/api/search?query="
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters}
+        Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
+        }
+}
+
+#Get permissions for a dashboard. Working before version 9.0.
+function Get-GrafPermissionsDashboard {
+	<#
+    .SYNOPSIS
+        Grafana Function Get permissions for a dashboard. Working before version 9.0.
+	.PARAMETER id
+		Dashboard id number.
+    .EXAMPLE
+        Get-GrafPermissionsDashboard -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -id 6
+    #>
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url,
+        [parameter(Mandatory=$true,position=3)]$id
+        )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+    $createDatasourceUri = "$Url/api/dashboards/id/$id/permissions"
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters}
+        Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
+        }
+}
+
+#Update permissions for a dashboard.
+function Add-GrafPermissionsDashboard {
+	<#
+    .SYNOPSIS
+        Grafana Function updates permissions for a dashboard. This operation will remove existing permissions if they’re not included in the request.
+		Permissions cannot be set for Admins - they always have access to everything.
+	.PARAMETER id
+		Dashboard id number.
+	.PARAMETER Access
+		parameter schema: role:(id||role),permission
+		transfer a role: team, user - compare with id. Example: "team:20,1","user:32,2"
+		transfer a role: role - compare with Viewer or Editor. Example: "role:Viewer,4"
+		transfer permission: View=1 Editor=2 Admin=4
+    .EXAMPLE
+        Get-GrafPermissionsDashboard -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -id 6 -Access "team:20,1","user:32,2","role:Viewer,4"
+    #>
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url,
+        [parameter(Mandatory=$true,position=3)]$id,
+        [parameter(Mandatory=$true,position=4)]$Access 
+        )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+    $createDatasourceUri = "$Url/api/dashboards/id/$id/permissions"
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "POST" -URI $createDatasourceUri -Credential $credential
+    $arr = @()
+    foreach ( $oneAccess in $Access ){
+        $findVariable = $oneAccess -split ","
+        $findRole = $findVariable[0] -split ":"
+        $findPerm = $findVariable[1]
+        switch ($findRole[0]) {
+            "team" { $roleid = "teamId";break }
+            "user" { $roleid = "userId";break }
+            "role" { $roleid = "role";break }
+        }
+        $arr += $addPermission = ('{"'+ $roleid +'":'+ $findRole[1] +',"permission":'+ $findPerm +'}')
+    }
+    $defPermission = @{
+        "items"=@(
+            $arr
+        )
+    }
+    $json = (ConvertTo-Json -InputObject $defPermission) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"{','{' -replace '}"','}'
+    Switch (GetOS){
+        Win32NT { $result = (Invoke-RestMethod @datasourceParameters -Body $json) }
+        Unix { $result = (Invoke-RestMethod @datasourceParameters -Body $json -SkipCertificateCheck) }
+        }
+    $return = ("ID:"+$id +" "+ $result.message +" for "+ $allAccess)
+    return $return
+}
+
+Export-ModuleMember -Function Get-GrafTeams, Get-GrafTeamMembers, Add-GrafTeamMembers, New-GrafTeam, Get-GrafUsers, Get-GrafUser, Get-GrafUserTeams, Get-GrafFoldersAndDashboards, Get-GrafPermissionsDashboard, Add-GrafPermissionsDashboard
