@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.1
+#Version 1.0.0.2
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -101,6 +101,7 @@ function Get-HostsZabbixAPI {
         "method"="host.get";
         "params"=@{
             "output"="extend"
+            "selectGroups"="extend"     #Group member
             };
         "auth" = $TokenApi;
         "id" = $TokenId;
