@@ -85,32 +85,35 @@ function Get-HostGroupsZabbixAPI {
 function Get-HostsZabbixAPI {
     <#
     .Example
-        Get-HostsZabbixAPI -UrlApi $urlApi -TokenApi $token.result -TokenId $token.id -filterHostName '"cgraf1","cgraf2"' | Format-Table
+        #Output only the groups you are looking for.
+        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterHostName '"cgraf1,cgraf2"' | Format-Table
+        #Output all groups.
+        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 | Format-Table
     #>
     param (
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
         [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
         [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][string]$filterHostName              #Example: "cgraf1,cgraf2"
+        [Parameter(Mandatory=$false,position=3)][string]$filterHostName              #Example: "cgraf1,cgraf2"
     )
-    $arrHS = @()
-    foreach ( $oneHS in ($filterHostName -split ",") ) {
-        $oneResHS = ('"'+ $oneHS +'"')
-        $arrHS += $oneResHS
-    }
-    $addHS = $arrHS -join ","
-    $qHost = ("["+ $addHS +"]")
-
     $getHost = @{
         "jsonrpc"="2.0";
         "method"="host.get";
         "params"=@{
-            "filter"=@{
-                "host"=$qHost;
-                };
+            "output"="extend"
             };
         "auth" = $TokenApi;
         "id" = $TokenId;
+    }
+    if($filterHostName){
+        $arrHS = @()
+        foreach ( $oneHS in ($filterHostName -split ",") ) {
+            $oneResHS = ('"'+ $oneHS +'"')
+            $arrHS += $oneResHS
+        }
+        $addHS = $arrHS -join ","
+        $filterName = @{"host"=@("[$addHS ]")}
+        $getHost.params.Add("filter",$filterName)
     }
     $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
