@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.3
+#Version 1.0.0.4
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -121,7 +121,7 @@ function Get-HostsZabbixAPI {
     $res.result
 }
 
-#New Create Host to Zabbix API _v6
+#New Create Host to Zabbix API _v7
 function New-HostZabbixAPI {
     <#
     .SYNOPSIS
@@ -179,47 +179,66 @@ function New-HostZabbixAPI {
     .PARAMETER Inventory_Mode
         Enable Inventory data. Select Manual or automatic filling of inventory data. Example: -Inventory_Mode (switch select: Manual,Auto)
     .EXAMPLE
-        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "Host" -IP "192.168.1.2" -DNS "Host.domain.info" -Group_HostId 2 -Proxy_HostId 10518 -Use_Agent -TemplateId 1001
-
-        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "host" -IP "192.168.1.2" -DNS "host.domain.info" -Group_HostId 2 -Proxy_HostId 10518 -Use_SNMP SNMPv3 -Use_IP_SNMP -Use_IPMI -Use_IP_IPMI -Tags "srv:SERVER,subsys:LINUX"
+        #Use Agent interface.
+        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "Host" -IP "192.168.1.2" -DNS "Host.domain.info" -Group_HostId 2 -Proxy_HostId 10518 -Use_Agent -TemplateId 1001 -Tags "srv:SERVER,subsys:LINUX"
+    .EXAMPLE
+        #Use SNMPv2 interface.
+        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "host" -IP "192.168.1.2" -DNS "host.domain.info" -Group_HostId 2 -Use_SNMPv2 -Use_IP_SNMP -SNMPv2_community "public"
+    .EXAMPLE
+        #Use SNMPv3 interface Secure level noAuthNoPriv.
+        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "host" -IP "192.168.1.2" -DNS "host.domain.info" -Group_HostId 2 -Use_SNMPv3 -Use_IP_SNMP -SNMPv3_securityname "Name" -SNMPv3_securitylevel noAuthNoPriv
+    .EXAMPLE
+        #Use SNMPv3 interface Secure level noAuthNoPriv.
+        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "host" -IP "192.168.1.2" -DNS "host.domain.info" -Group_HostId 2 -Use_SNMPv3 -Use_IP_SNMP -SNMPv3_securityname "Name" -SNMPv3_securitylevel authNoPriv -SNMPv3_authprotocol MD5 -SNMPv3_authpassphrase "Hello"
+    .EXAMPLE
+        #Use SNMPv3 interface Secure level authPriv.
+        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "host" -IP "192.168.1.2" -DNS "host.domain.info" -Group_HostId 2 -Use_SNMPv3 -Use_IP_SNMP -SNMPv3_securityname "Name" -SNMPv3_securitylevel authNoPriv -SNMPv3_authprotocol MD5 -SNMPv3_authpassphrase "Hello" -SNMPv3_privprotocol DES -SNMPv3_privpassphrase "Good"
+    .Example
+        #Use Agent interface and SNMPv2 interface and IPMI interface.
+        New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "host" -IP "192.168.1.2" -DNS "host.domain.info" -Group_HostId 2 -Use_Agent -Use_SNMPv2 -SNMPv2_community "public" -Use_IPMI -Tags "srv:SERVER,subsys:LINUX"
     #>
     param(
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,                                                 #URL Zabbix API.
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,                                               #User Token Zabbix API.
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,                                                   #User ID Zabbix API.
-        [Parameter(Mandatory=$true,position=3)][string]$HostName,                                               #Host Name.
-        [Parameter(Mandatory=$true,position=4)][ValidatePattern("\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b")]$IP,  #Host IP address.
-        [Parameter(Mandatory=$true,position=5)][string]$DNS,                                                    #Host DNS Name.
-        [Parameter(Mandatory=$true,position=6)][array]$Group_HostId,                                            #Group Host ID.
-        [Parameter(Mandatory=$false,position=7)][int]$Proxy_HostId,                                             #Proxy Host ID.
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v2",position=8)][switch]$Use_SNMPv2,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][switch]$Use_SNMPv3,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v2",position=8)][string]$SNMPv2_community = "public",
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][string]$SNMPv3_securityname,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][ValidateSet("noAuthNoPriv","authNoPriv","authPriv")]$SNMPv3_securitylevel,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][string]$SNMPv3_authpassphrase,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][string]$SNMPv3_privpassphrase,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][ValidateSet("MD5","SHA1","SHA224","SHA256","SHA384","SHA512")]$SNMPv3_authprotocol,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][ValidateSet("DES","AES128","AES192","AES256","AES192C","AES256C")]$SNMPv3_privprotocol,
-        [Parameter(Mandatory=$false,ParameterSetName="SNMP_v2",position=8)][Parameter(Mandatory=$false,ParameterSetName="SNMP_v3",position=8)][switch]$Use_IP_SNMP,
-        [Parameter(Mandatory=$false,position=9)][switch]$Use_IPMI, [switch]$Use_IP_IPMI,
-        [Parameter(Mandatory=$false,position=10)][switch]$Use_Agent, [switch]$Use_IP_Agent,
-        [Parameter(Mandatory=$false,position=11)][string]$Tags,                                                 #Tags Host.
-        [Parameter(Mandatory=$false,position=12)][array]$TemplateId,                                            #Template.
-        [Parameter(Mandatory=$false,position=13)][ValidateSet("Manual","Auto")]$Inventory_Mode                  #Enable Inventory data.
+        [Parameter(Mandatory=$true, position=0)][string]$UrlApi,                                                 #URL Zabbix API.
+        [Parameter(Mandatory=$true, position=1)][string]$TokenApi,                                               #User Token Zabbix API.
+        [Parameter(Mandatory=$true, position=2)][int]$TokenId,                                                   #User ID Zabbix API.
+        [Parameter(Mandatory=$true, position=3)][string]$HostName,                                               #Host Name.
+        [Parameter(Mandatory=$true, position=4)][ValidatePattern("\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b")]$IP,  #Host IP address.
+        [Parameter(Mandatory=$true, position=5)][string]$DNS,                                                    #Host DNS Name.
+        [Parameter(Mandatory=$true, position=6)][array]$Group_HostId,                                            #Group Host ID.
+        [Parameter(Mandatory=$false,position=7)][int]$Proxy_HostId,                                              #Proxy Host ID.
+        [Parameter(Mandatory=$false,position=8)][switch]$Use_Agent, 
+        [Parameter(Mandatory=$false,position=9)][switch]$Use_IP_Agent,
+        [Parameter(Mandatory=$false,position=10)][switch]$Use_SNMPv2,
+        [Parameter(Mandatory=$false,position=11)][switch]$Use_SNMPv3,
+        [Parameter(Mandatory=$false,position=12)][string]$SNMPv2_community,
+        [Parameter(Mandatory=$false,position=13)][string]$SNMPv3_securityname,
+        [Parameter(Mandatory=$false,position=14)][ValidateSet("noAuthNoPriv","authNoPriv","authPriv")]$SNMPv3_securitylevel,
+        [Parameter(Mandatory=$false,position=15)][ValidateSet("MD5","SHA1","SHA224","SHA256","SHA384","SHA512")]$SNMPv3_authprotocol,
+        [Parameter(Mandatory=$false,position=16)][string]$SNMPv3_authpassphrase,
+        [Parameter(Mandatory=$false,position=17)][ValidateSet("DES","AES128","AES192","AES256","AES192C","AES256C")]$SNMPv3_privprotocol,
+        [Parameter(Mandatory=$false,position=18)][string]$SNMPv3_privpassphrase,
+        [Parameter(Mandatory=$false,position=19)][switch]$Use_IP_SNMP,
+        [Parameter(Mandatory=$false,position=20)][switch]$Use_IPMI, 
+        [Parameter(Mandatory=$false,position=21)][switch]$Use_IP_IPMI,
+        [Parameter(Mandatory=$false,position=22)][string]$Tags,                                                 #Tags Host.
+        [Parameter(Mandatory=$false,position=23)][array]$TemplateId,                                            #Template.
+        [Parameter(Mandatory=$false,position=24)][ValidateSet("Manual","Auto")]$Inventory_Mode                  #Enable Inventory data.
     )
     ###Interface #######################################
     ##Agent Interfaces##
     if ( $Use_Agent ){
         #Use SNMP protocol for management Host.#Should the connection be made via an IP address.
-        if ( $Use_IP_Agent ) { $useipAgent = 1 }
-        else { $useipAgent = 0 }
+        if ( $Use_IP_Agent ) { 
+            $useipAgent = 1 
+        } else { 
+            $useipAgent = 0 
+        }
         $interfacesAgent = @{
             "type"=1;
             "main"=1;
             "useip"=$useipAgent;
-            "ip"=$ip;
-            "dns"=$dns;
+            "ip"=$IP;
+            "dns"=$DNS;
             "port"="10050"
         }
         $jsonAgent = (ConvertTo-Json -InputObject $interfacesAgent) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
@@ -316,13 +335,12 @@ function New-HostZabbixAPI {
         #Use SNMP protocol for management Host.#Should the connection be made via an IP address.
         if ( $Use_IP_Agent ) { $useipAgent = 1 }
         else { $useipAgent = 0 }
-        
         $interfacesAgent = @{
             "type"=1;
             "main"=1;
             "useip"=$useipAgent;
-            "ip"=$ip;
-            "dns"=$dns;
+            "ip"=$IP;
+            "dns"=$DNS;
             "port"="10050"
         }
         $jsonAgent = (ConvertTo-Json -InputObject $interfacesAgent) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
