@@ -7,6 +7,8 @@ function manageGrafanaNewTeamsLdapToml {
       Create new teams in Grafana from the ldap.toml configuration file. 
    .DESCRIPTION
       Use the script, so far only on Linux.
+      This script creates teams in Grafana by selecting the names of LDAP groups from the ldap.toml file. 
+      The teams will be created only if it is missing in Grafana or does not match the group name in Ldap.toml
    .PARAMETER login
       User with administrator rights in Grafana. Example: userGrafana
    .PARAMETER passwd
