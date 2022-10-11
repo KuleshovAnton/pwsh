@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.4
+#Version 1.0.0.5
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -38,7 +38,6 @@ function Connect-ZabbixAPI {
     $token = (Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body ($data | ConvertTo-Json) -ContentType "application/json;charset=UTF-8")
     return $token
 }
-
 #########################################
 #Working with hosts and groups Zabbix API.
 #Host Groups Zabbix API.
@@ -80,7 +79,6 @@ function Get-HostGroupsZabbixAPI {
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-
 #Host Zabbix API
 function Get-HostsZabbixAPI {
     <#
@@ -120,7 +118,6 @@ function Get-HostsZabbixAPI {
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     $res.result
 }
-
 #New Create Host to Zabbix API _v7
 function New-HostZabbixAPI {
     <#
@@ -411,7 +408,6 @@ function New-HostZabbixAPI {
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
 }
-
 #########################################
 #Working with Template Zabbix API.
 #Get all Template Zabbix API
@@ -525,9 +521,9 @@ function Get-UserZabbixAPI {
     .PARAMETER SelectUsrGrps
         Return user groups that the user belongs to in the usrgrps property
     .Example
-        Get-UserZabbixAPI-UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid
+        Get-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid
     .Example
-        Get-UserZabbixAPI-UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -filterUser "User1,User2" -SelectMedias -SelectMediaTypes -SelectUsrGrps
+        Get-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -filterUser "User1,User2" -SelectMedias -SelectMediaTypes -SelectUsrGrps
     #>
     param (
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
@@ -574,7 +570,7 @@ function Get-UserZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-function New-UserZabbixAPI{
+function New-UserZabbixAPI {
     <#
     .SYNOPSIS
         This method allows to create new users, via Zabbix API.
@@ -624,6 +620,40 @@ function New-UserZabbixAPI{
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
 }
+function Remove-UserZabbixAPI {
+    <#
+    .SYNOPSIS
+        This method allows to delete users, via Zabbix API.
+    .PARAMETER RemoveUser
+        Select UsersId. Example: -RemoveUser "4" or -RemoveUser "4,6,45,104"
+    .Example
+        Remove-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -RemoveUser "3,44"
+    #>
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$true,position=3)][array]$RemoveUser
+    )
+    $delUser = @{
+        "jsonrpc"="2.0";
+        "method"="user.delete";
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    If($RemoveUser){
+        $arrR = @()
+        foreach ( $oneRemoveUser in ($RemoveUser -split ",") ){
+        $resRemoveUser = ('"'+ $oneRemoveUser +'"')
+        $arrR += $resRemoveUser
+        }
+        $addRemoveUser = $arrR -join ","
+        $delUser.Add("params","[$addRemoveUser]")
+    }
+    $json = (ConvertTo-Json -InputObject $delUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
 #########################################
 #Working with User Roles Zabbix API.
 function Get-UserRoleZabbixAPI {
@@ -672,4 +702,6 @@ function Get-UserRoleZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI
+Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Get-UserRoleZabbixAPI
+
+
