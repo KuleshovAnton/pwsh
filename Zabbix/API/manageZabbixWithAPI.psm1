@@ -452,5 +452,224 @@ function Get-TemplateZabbixAPI {
    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
    return $res.result
 }
-
+#########################################
+#Working with Groups Users Zabbix API.
+function Get-UserGroupZabbixAPI {
+    <#
+    .SYNOPSIS
+        The method allows to retrieve users according to the given parameters, via Zabbix API.
+    .PARAMETER filterUserGroup
+        Select User Groups.
+    .PARAMETER IncomingUsers
+        Return the users from the user group in the users property.
+    .PARAMETER ReturnRights
+        Return user group rights in the rights property. It has the following properties: permission - access level to the host group; id - ID of the host group.
+    .Example
+        Get-UserGroupZabbixAPI "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid
+    .Example
+        Get-UserGroupZabbixAPI "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -filterUserGroup "Group1,Group2" -IncomingUsers -ReturnRights
+    #>
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$false,position=3)][array]$filterUserGroup,
+        [Parameter(Mandatory=$false,position=4)][switch]$IncomingUsers,
+        [Parameter(Mandatory=$false,position=5)][switch]$ReturnRights
+    )
+    $getUserGroup = @{
+        "jsonrpc"="2.0";
+        "method"="usergroup.get";
+        "params"=@{
+            "output"="extend";       
+            "status"=0
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    #Filter
+    if($filterUserGroup){
+        $arrUSGP = @()
+        foreach ( $oneUSGP in ($filterUserGroup -split ",") ) {
+            $oneResUSGP = ('"'+ $oneUSGP +'"')
+            $arrUSGP  += $oneResUSGP
+        }
+        $addUSGP = $arrUSGP -join ","
+        $filterName = @{"name"= @("[$addUSGP]")}
+        $getUserGroup.params.Add("filter",$filterName)
+    }
+    #Входящие пользователи в группу.
+    If($IncomingUsers){
+        $getUserGroup.params.Add("selectUsers","extend")
+    }
+    #Возврат прав доступа для группы хостов. permission - уровень прав доступа к группе хостов; id - ID группы хостов.
+    If($ReturnRights){
+        $getUserGroup.params.Add("selectRights","extend")
+    }
+    $json = (ConvertTo-Json -InputObject $getUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+#########################################
+#Working with Users Zabbix API.
+function Get-UserZabbixAPI {
+    <#
+    .SYNOPSIS
+        The method allows to retrieve users according to the given parameters, via Zabbix API.
+    .PARAMETER filterUser
+        Select Users.
+    .PARAMETER SelectMedias
+        Return media used by the user in the medias property.
+    .PARAMETER SelectMediaTypes
+        Return media types used by the user in the mediatypes property.
+    .PARAMETER SelectUsrGrps
+        Return user groups that the user belongs to in the usrgrps property
+    .Example
+        Get-UserZabbixAPI-UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid
+    .Example
+        Get-UserZabbixAPI-UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -filterUser "User1,User2" -SelectMedias -SelectMediaTypes -SelectUsrGrps
+    #>
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$false,position=3)][array]$filterUser,
+        [Parameter(Mandatory=$false,position=4)][switch]$SelectMedias,
+        [Parameter(Mandatory=$false,position=5)][switch]$SelectMediaTypes,
+        [Parameter(Mandatory=$false,position=6)][switch]$SelectUsrGrps
+    )
+    $getUser = @{
+        "jsonrpc"="2.0";
+        "method"="user.get";
+        "params"=@{
+            "output"="extend"
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    #Filter
+    if($filterUser){
+        $arrUS = @()
+        foreach ( $oneUS in ($filterUser -split ",") ) {
+            $oneResUS = ('"'+ $oneUS +'"')
+            $arrUS  += $oneResUS
+        }
+        $addUS = $arrUS -join ","
+        $filterName = @{"username"= @("[$addUS]")}
+        $getUser.params.Add("filter",$filterName)
+    }
+    #Возврат оповещений пользователея, которые используются пользователем.
+    If($SelectMedias){
+        $getUser.params.Add("selectMedias","extend")
+    }
+    #Возврат способов оповещения, которые используются пользователем.
+    If($SelectMediaTypes){
+        $getUser.params.Add("selectMediatypes","extend")
+    }
+    #Возврат групп пользователей, которым принадлежат пользователи.
+    If($SelectUsrGrps){
+        $getUser.params.Add("selectUsrgrps","extend")
+    }
+    $json = (ConvertTo-Json -InputObject $getUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+function New-UserZabbixAPI{
+    <#
+    .SYNOPSIS
+        This method allows to create new users, via Zabbix API.
+    .PARAMETER NewUser
+        User Name.
+    .PARAMETER NewUserPass
+        User password.
+    .PARAMETER UserGroupsId
+        User groups to add the user to. Use group id. Example -UserGroups "5,6"
+    .PARAMETER UserRolesId
+        User role to add the user to. Use role id. Example: -UserRolesId 1
+    .Example
+        New-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -NewUser TestPS -NewUserPass "Passw0rd" -UserGroupsId "13,15" -UserRolesId 1
+    #>
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$true,position=3)][array]$NewUser,
+        [Parameter(Mandatory=$true,position=4)][string]$NewUserPass,        #User Password
+        [Parameter(Mandatory=$true,position=5)][array]$UserGroupsId,          #Groups
+        [Parameter(Mandatory=$true,position=6)][int]$UserRolesId            #User Roles
+        #[Parameter(Mandatory=$false,position=6)][array]$NewUserMedia       #Medias
+    )
+    $newUser = @{
+        "jsonrpc"="2.0";
+        "method"="user.create";
+        "params"=@{
+            "alias"=$NewUser;
+            "passwd"=$NewUserPass;
+            "roleid"=$UserRolesId;
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    #Add GroupsID to JSON.
+    if($UserGroupsId){
+        $arrUserGroups  = @()
+        foreach ( $oneUserGroups  in ($UserGroupsId -split ",") ) {
+            $resUserGroups  = ( '{"usrgrpid":"'+ $oneUserGroups  +'"}' )
+            $arrUserGroups  += $resUserGroups
+        }
+        $addUserGroups  = $arrUserGroups -join ","
+        $newUser.params.Add("usrgrps",@($addUserGroups))
+    }
+    $json = (ConvertTo-Json -InputObject $newUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"\{','{' -replace '\}"','}'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res
+}
+#########################################
+#Working with User Roles Zabbix API.
+function Get-UserRoleZabbixAPI {
+    <#
+    .SYNOPSIS
+        The method allows to retrieve roles according to the given parameters, via Zabbix API.
+    .PARAMETER SelectRules
+        Return role rules in the rules property.
+    .PARAMETER SelectUsers
+        Select users this role is assigned to.
+    .PARAMETER Roleids
+        Return only roles with the given IDs. Example: 
+    .Example
+        Get-UserRoleZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -SelectUsers -roleids "5,6"
+    #>
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$false,position=3)][switch]$SelectRules,
+        [Parameter(Mandatory=$false,position=4)][switch]$SelectUsers,
+        [Parameter(Mandatory=$false,position=5)][array]$Roleids
+    )
+    $getRole = @{
+        "jsonrpc"="2.0";
+        "method"="role.get";
+        "params"=@{
+            "output"="extend";
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    #Return role rules in the rules property.
+    If($SelectRules){
+        $getRole.params.Add("selectRules","extend")
+    }
+    #Select users this role is assigned to.
+    If($selectUsers){
+        $getRole.params.Add("selectUsers","extend")
+    }
+    #Return only roles with the given IDs.
+    If($Roleids){
+        $getRole.params.Add("roleids","[$Roleids]")
+    }
+    $json = (ConvertTo-Json -InputObject $getRole) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
 Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI
