@@ -38,6 +38,7 @@ function Connect-ZabbixAPI {
     $token = (Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body ($data | ConvertTo-Json) -ContentType "application/json;charset=UTF-8")
     return $token
 }
+
 #########################################
 #Working with hosts and groups Zabbix API.
 #Host Groups Zabbix API.
@@ -54,7 +55,7 @@ function Get-HostGroupsZabbixAPI {
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
         [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
         [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][array]$filterGroupName              #Example: "Zabbix servers,Linux servers"
+        [Parameter(Mandatory=$false,position=3)][array]$filterGroupName
     )
     $getGroup = @{
         "jsonrpc"="2.0";
@@ -65,6 +66,7 @@ function Get-HostGroupsZabbixAPI {
         "auth" = $TokenApi;
         "id" = $TokenId
     }
+    #Filter
     if($filterGroupName){
         $arrGp = @()
         foreach ( $oneGp in ($filterGroupName -split ",") ) {
@@ -92,7 +94,7 @@ function Get-HostsZabbixAPI {
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
         [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
         [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][string]$filterHostName              #Example: "cgraf1,cgraf2"
+        [Parameter(Mandatory=$false,position=3)][string]$filterHostName
     )
     $getHost = @{
         "jsonrpc"="2.0";
@@ -104,6 +106,7 @@ function Get-HostsZabbixAPI {
         "auth" = $TokenApi;
         "id" = $TokenId;
     }
+    #Filter
     if($filterHostName){
         $arrHS = @()
         foreach ( $oneHS in ($filterHostName -split ",") ) {
@@ -408,6 +411,7 @@ function New-HostZabbixAPI {
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
 }
+
 #########################################
 #Working with Template Zabbix API.
 #Get all Template Zabbix API
@@ -423,7 +427,7 @@ function Get-TemplateZabbixAPI {
        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-       [Parameter(Mandatory=$false,position=3)][array]$filterTemplateName       #Example: "Linux by Zabbix agent,Template 1"
+       [Parameter(Mandatory=$false,position=3)][array]$filterTemplateName
    )
    $getTemplate = @{
        "jsonrpc"="2.0";
@@ -434,6 +438,7 @@ function Get-TemplateZabbixAPI {
        "auth" = $TokenApi;
        "id" = $TokenId
    }
+   #Filter
    if($filterTemplateName){
         $arrTm = @()
         foreach ( $oneTm in ($filterTemplateName -split ",") ) {
@@ -448,6 +453,7 @@ function Get-TemplateZabbixAPI {
    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
    return $res.result
 }
+
 #########################################
 #Working with Groups Users Zabbix API.
 function Get-UserGroupZabbixAPI {
@@ -494,11 +500,11 @@ function Get-UserGroupZabbixAPI {
         $filterName = @{"name"= @("[$addUSGP]")}
         $getUserGroup.params.Add("filter",$filterName)
     }
-    #Входящие пользователи в группу.
+    #Members of the group.
     If($IncomingUsers){
         $getUserGroup.params.Add("selectUsers","extend")
     }
-    #Возврат прав доступа для группы хостов. permission - уровень прав доступа к группе хостов; id - ID группы хостов.
+    #Return permissions for a group of hosts. permission - the level of access rights to a group of hosts; id - ID of the host group.
     If($ReturnRights){
         $getUserGroup.params.Add("selectRights","extend")
     }
@@ -506,6 +512,7 @@ function Get-UserGroupZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
+
 #########################################
 #Working with Users Zabbix API.
 function Get-UserZabbixAPI {
@@ -554,15 +561,15 @@ function Get-UserZabbixAPI {
         $filterName = @{"username"= @("[$addUS]")}
         $getUser.params.Add("filter",$filterName)
     }
-    #Возврат оповещений пользователея, которые используются пользователем.
+    #Return user alerts that are used by the user.
     If($SelectMedias){
         $getUser.params.Add("selectMedias","extend")
     }
-    #Возврат способов оповещения, которые используются пользователем.
+    #Return the notification methods that the user is using.
     If($SelectMediaTypes){
         $getUser.params.Add("selectMediatypes","extend")
     }
-    #Возврат групп пользователей, которым принадлежат пользователи.
+    #Return user groups that users belong to.
     If($SelectUsrGrps){
         $getUser.params.Add("selectUsrgrps","extend")
     }
@@ -589,13 +596,13 @@ function New-UserZabbixAPI {
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
         [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
         [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][array]$NewUser,
-        [Parameter(Mandatory=$true,position=4)][string]$NewUserPass,        #User Password
-        [Parameter(Mandatory=$true,position=5)][array]$UserGroupsId,          #Groups
-        [Parameter(Mandatory=$true,position=6)][int]$UserRolesId            #User Roles
-        #[Parameter(Mandatory=$false,position=6)][array]$NewUserMedia       #Medias
+        [Parameter(Mandatory=$true,position=3)][string]$NewUser,
+        [Parameter(Mandatory=$true,position=4)][string]$NewUserPass,
+        [Parameter(Mandatory=$true,position=5)][array]$UserGroupsId,
+        [Parameter(Mandatory=$true,position=6)][int]$UserRolesId
+        #[Parameter(Mandatory=$false,position=6)][array]$UserMedia
     )
-    $newUser = @{
+    $createUser = @{
         "jsonrpc"="2.0";
         "method"="user.create";
         "params"=@{
@@ -614,9 +621,9 @@ function New-UserZabbixAPI {
             $arrUserGroups  += $resUserGroups
         }
         $addUserGroups  = $arrUserGroups -join ","
-        $newUser.params.Add("usrgrps",@($addUserGroups))
+        $createUser.params.Add("usrgrps",@($addUserGroups))
     }
-    $json = (ConvertTo-Json -InputObject $newUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"\{','{' -replace '\}"','}'
+    $json = (ConvertTo-Json -InputObject $createUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"\{','{' -replace '\}"','}'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
 }
@@ -654,6 +661,89 @@ function Remove-UserZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
+function Set-UserZabbixAPI {
+    <#
+    .SYNOPSIS
+        This method allows to update existing users, via Zabbix API. The userid property must be defined for each user, all other properties are optional. Only the passed properties will be updated, all others will remain unchanged. Passed properties overwrite, existing data
+    .PARAMETER Username
+        Change User Name.
+    .PARAMETER Name
+        Change Name.
+    .PARAMETER Surname
+        Change Surname.
+    .PARAMETER UrlAfterLogin
+        Change URL of the page to redirect the user to after logging in.
+    .PARAMETER Passwd
+        Change User Password.
+    .PARAMETER $UserRoleId
+        Change Role ID of the user.
+    .PARAMETER $Usrgrps
+        Change User groups to replace existing user groups. The user groups must have the usrgrpid property defined. Example: -Usrgrps "1" or -Usrgrps "2,14,105"
+    .Example
+        Set-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -UserId 47 -Username User1 -Usrgrps "13,14,15" -UserRoleId 2 
+    #>
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$true,position=3)][int]$UserId,
+        [Parameter(Mandatory=$false,position=4)][string]$Username,
+        [Parameter(Mandatory=$false,position=5)][string]$Name,
+        [Parameter(Mandatory=$false,position=6)][string]$Surname,
+        [Parameter(Mandatory=$false,position=7)][string]$UrlAfterLogin,
+        [Parameter(Mandatory=$false,position=8)][string]$Passwd,
+        [Parameter(Mandatory=$false,position=9)][int]$UserRoleId,
+        [Parameter(Mandatory=$false,position=10)][array]$Usrgrps
+    )
+
+    $updateUser = @{
+        "jsonrpc"="2.0";
+        "method"="user.update";
+        "params"=@{
+            "userid"=$UserId;
+        }
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    #Rename User Name.
+    If($Username){
+        $updateUser.params.Add("username",$Username)
+    }
+    #Rename Name.
+    If($Name){
+        $updateUser.params.Add("name",$Name)
+    }
+    #Rename Surname.
+    If($Surname){
+        $updateUser.params.Add("surname",$Surname)
+    }
+    #Change Url After Login.
+    If($UrlAfterLogin){
+        $updateUser.params.Add("url",$UrlAfterLogin)
+    }
+    #Change User Password.
+    If($Passwd){
+        $updateUser.params.Add("passwd",$Passwd)
+    }
+    #Change User RoleID.
+    If($UserRoleId){
+        $updateUser.params.Add("roleid",$UserRoleId)
+    }
+    #Change\Add User Groups.
+    if($Usrgrps){
+        $arrUGC = @()
+        foreach ( $oneUGC in ($Usrgrps -split ",") ) {
+            $oneResUGC = ('{"usrgrpid":'+ $oneUGC +'}')
+            $arrUGC  += $oneResUGC
+        }
+        $addUGC = $arrUGC -join ","
+        $updateUser.params.Add("usrgrps","[$addUGC]")
+    }
+    $json = (ConvertTo-Json -InputObject $updateUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"\{','{' -replace '\}"','}'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+
 #########################################
 #Working with User Roles Zabbix API.
 function Get-UserRoleZabbixAPI {
@@ -702,6 +792,6 @@ function Get-UserRoleZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Get-UserRoleZabbixAPI
+Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Set-UserZabbixAPI, Get-UserRoleZabbixAPI
 
 
