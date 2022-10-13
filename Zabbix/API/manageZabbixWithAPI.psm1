@@ -517,14 +517,21 @@ function New-UserGroupZabbixAPI {
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
         [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
         [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][string]$NewUserGroup
+        [Parameter(Mandatory=$true,position=3)][string]$NewUserGroup,
+        [Parameter(Mandatory=$true,position=4)][ValidateSet("SysDefault","Internal","LDAP","NotFrontend")]$GuiAccess
     )
+    switch ($GuiAccess) {
+        "SysDefault"    { $gAccess = 0 }
+        "Internal"      { $gAccess = 1 }
+        "LDAP"          { $gAccess = 2 }
+        "NotFrontend"   { $gAccess = 3 }
+    }
     $createUserGroup = @{
         "jsonrpc"="2.0";
         "method"="usergroup.create";
         "params"=@{
             "name"="$NewUserGroup";
-            "gui_access"=2;
+            "gui_access"=$gAccess;
             "users_status"=0
         };
         "auth" = $TokenApi;
