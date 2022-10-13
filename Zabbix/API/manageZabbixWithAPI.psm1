@@ -512,7 +512,28 @@ function Get-UserGroupZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-
+function New-UserGroupZabbixAPI {
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$true,position=3)][string]$NewUserGroup
+    )
+    $createUserGroup = @{
+        "jsonrpc"="2.0";
+        "method"="usergroup.create";
+        "params"=@{
+            "name"="$NewUserGroup";
+            "gui_access"=2;
+            "users_status"=0
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    $json = (ConvertTo-Json -InputObject $createUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res
+}
 #########################################
 #Working with Users Zabbix API.
 function Get-UserZabbixAPI {
