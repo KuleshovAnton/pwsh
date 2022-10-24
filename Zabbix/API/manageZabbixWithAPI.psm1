@@ -541,6 +541,7 @@ function New-UserGroupZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
 }
+
 #########################################
 #Working with Users Zabbix API.
 function Get-UserZabbixAPI {
@@ -627,7 +628,9 @@ function New-UserZabbixAPI {
         [Parameter(Mandatory=$true,position=3)][string]$NewUser,
         [Parameter(Mandatory=$true,position=4)][string]$NewUserPass,
         [Parameter(Mandatory=$true,position=5)][array]$UserGroupsId,
-        [Parameter(Mandatory=$true,position=6)][int]$UserRolesId
+        [Parameter(Mandatory=$true,position=6)][int]$UserRolesId,
+        [Parameter(Mandatory=$false,position=7)][string]$NewUserName,
+        [Parameter(Mandatory=$false,position=8)][string]$NewUserSurname
         #[Parameter(Mandatory=$false,position=6)][array]$UserMedia
     )
     $createUser = @{
@@ -651,6 +654,13 @@ function New-UserZabbixAPI {
         $addUserGroups  = $arrUserGroups -join ","
         $createUser.params.Add("usrgrps",@($addUserGroups))
     }
+    if($NewUserName){
+        $createUser.params.Add("name",$NewUserName)
+    }
+    if($NewUserSurname){
+        $createUser.params.Add("surname",$NewUserSurname)
+    }
+
     $json = (ConvertTo-Json -InputObject $createUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"\{','{' -replace '\}"','}'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
