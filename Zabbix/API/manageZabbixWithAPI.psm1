@@ -830,6 +830,97 @@ function Get-UserRoleZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, New-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Set-UserZabbixAPI, Get-UserRoleZabbixAPI
 
+#########################################
+#Working with Maintenance Zabbix API.
+function Get-MaintenanceZabbixAPI {
+    <#
+    .SYNOPSIS
+        The method allows to retrieve maintenances according to the given parameters., via Zabbix API.
+    .PARAMETER SelectGroups
+        Return a groups property with host groups assigned to the maintenance. Example: -SelectGroups
+    .PARAMETER SelectHosts
+        Return a hosts property with hosts assigned to the maintenance. Example: -SelectHosts
+    .PARAMETER SelectTimeperiods
+        Return a timeperiods property with time periods of the maintenance. Example: -SelectTimeperiods
+    .PARAMETER SelectTags
+        Return a tags property with problem tags of the maintenance. Example: -SelectTags
+    .PARAMETER FilterMaintenance
+        Search by Name maintenance. Example: -FilterMaintenance "maintenance1,maintenance2"
+    .PARAMETER FindHostIds
+        Return only maintenances that are assigned to the given hosts. Example: -FindHostIds "10001,13409"
+    .PARAMETER FindGroupIds
+        Return only maintenances that are assigned to the given host groups. Example: -FindGroupIds "2324,2453"
+    .PARAMETER FindMaintenanceIds
+        Return only maintenances with the given IDs. Example: -FindMaintenanceIds "4555,6555"
+    .Example
+        Get-MaintenanceZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid
+    .Example
+        Get-MaintenanceZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -FilterMaintenance "maintenance1,maintenance2"
+    #>
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$false,position=3)][switch]$SelectGroups,
+        [Parameter(Mandatory=$false,position=4)][switch]$SelectHosts,
+        [Parameter(Mandatory=$false,position=5)][switch]$SelectTimeperiods,
+        [Parameter(Mandatory=$false,position=6)][switch]$SelectTags,
+        [Parameter(Mandatory=$false,position=7)][array]$FilterMaintenance,
+        [Parameter(Mandatory=$false,position=8)][array]$FindHostIds,
+        [Parameter(Mandatory=$false,position=9)][array]$FindGroupIds,
+        [Parameter(Mandatory=$false,position=10)][array]$FindMaintenanceIds
+    )
+    $getMaintenance = @{
+        "jsonrpc"="2.0";
+        "method"="maintenance.get";
+        "params"=@{
+            "output"="extend";
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    If($SelectGroups){
+        $getMaintenance.params.Add("selectGroups","extend")
+    }
+    If($SelectHosts){
+        $getMaintenance.params.Add("selectHosts","extend")
+    }
+    If($SelectTimeperiods){
+        $getMaintenance.params.Add("selectTimeperiods","extend")
+    }
+    If($SelectTags){
+        $getMaintenance.params.Add("selectTags","extend")
+    }
+    #Filter
+    if($FilterMaintenance){
+        $arrMT = @()
+        foreach ( $oneMT in ($FilterMaintenance -split ",") ) {
+            $oneResMT = ('"'+ $oneMT +'"')
+            $arrMT  += $oneResMT
+        }
+        $addMT = $arrMT -join ","
+        $filterName = @{"name"= @("[$addMT]")}
+        $getMaintenance.params.Add("filter",$filterName)
+    }
+    #Return only those services that are assigned to the specified network nodes.
+    if($FindHostIds){
+        $addFindH = $FindHostIds -replace "\s"
+        $getMaintenance.params.Add("hostids","[$addFindH]")
+    }
+    #Return only those services that are assigned to the specified groups of network nodes.
+    if($FindGroupIds){
+        $addFindG = $FindGroupIds -replace "\s"
+        $getMaintenance.params.Add("groupids","[$addFindG]")
+    }
+    #Return of services with specified IDs only.
+    if($FindMaintenanceIds){
+        $addFindM = $FindMaintenanceIds -replace "\s"
+        $getMaintenance.params.Add("maintenanceids","[$addFindM]")
+    } 
+    $json = (ConvertTo-Json -InputObject $getMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
 
+Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, New-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Set-UserZabbixAPI, Get-UserRoleZabbixAPI, Get-MaintenanceZabbixAPI
