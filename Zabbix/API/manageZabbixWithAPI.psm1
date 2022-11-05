@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.5
+#Version 1.0.0.6
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -8,9 +8,17 @@ function Connect-ZabbixAPI {
         Start using this commandlet. You can add it as a variable for further use of the created token and the token ID. 
         This cmdlet will be authorized on the Zabbix server API using the username and password provided by you, in response 
         Zabbix will return the created token to you. Use this token and token id in subsequent commandlets.
+    .PARAMETER UrlApi
+        Specify the URL to connect to the Zabbix API. Example -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php'
+    .PARAMETER User
+        A Zabbix user who has rights to connect to the Zabbix API. Example: -User UserAdmin
+    .PARAMETER TokenId
+        The user ID when logging into the Zabbix API. Set a random number. Example: -TokenId 2
+    .PARAMETER inPasswd
+        Enter the password. If you do not specify a password, the system will ask you to enter it.
     .EXAMPLE
         Connect-ZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -User UserAdmin -TokenId 2
-        Connect-ZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -User UserAdmin -TokenId 2 -Passwd "Passw0rd"
+        Connect-ZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -User UserAdmin -TokenId 2 -inPasswd "Passw0rd"
     #>
     param(
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
@@ -922,5 +930,191 @@ function Get-MaintenanceZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
+function New-MaintenanceZabbixAPI {
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$true,position=3)][string]$NameMaintenance,
+        [Parameter(Mandatory=$true,position=4)][datetime]$ActiveSince,
+        [Parameter(Mandatory=$true,position=5)][datetime]$ActiveTill,
+        [Parameter(Mandatory=$false,position=6)][ValidateSet("WithData","NoData")]$MaintenanceType,
+        [Parameter(Mandatory=$false,position=7)][array]$groupids,
+        [Parameter(Mandatory=$false,position=8)][array]$hostids
+    )
 
-Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, New-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Set-UserZabbixAPI, Get-UserRoleZabbixAPI, Get-MaintenanceZabbixAPI
+    try {  
+        $ErrorActionPreference = "Stop"
+        $AS = Get-Date $ActiveSince -UFormat %s
+        $AT = Get-Date $ActiveTill -UFormat %s
+        $periodStartDate = $AS
+
+        switch ($MaintenanceType) {
+            "NoData" { $mType = 1 }
+            "WithData" { $mType = 0 }
+            Default { $mType = 0 }
+        }
+
+        $createMaintenance = @{
+            "jsonrpc"="2.0";
+            "method"="maintenance.create";
+            "params"=@{
+                "name"="$NameMaintenance";
+                "active_since"=$AS;
+                "active_till"=$AT;
+                "maintenance_type"=$mType
+            };
+            "auth" = $TokenApi;
+            "id" = $TokenId
+        }
+
+        #Add periods
+        $periodTimeType = 0
+        $periodEvery = 1
+        $periodMonth = 0
+        $periodDayofweek = 0
+        $periodDay = 0
+        $periodStartTime = 0
+        $Period = 31536000
+        $periods = @{
+            "timeperiod_type"=$periodTimeType
+            "every"=$periodEvery
+            "month"=$periodMonth
+            "dayofweek"=$periodDayofweek
+            "day"=$periodDay
+            "start_time"=$periodStartTime
+            "period"=$Period
+            "start_date"=$periodStartDate
+        }
+        $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
+        $createMaintenance.params.Add("timeperiods",@($jsonPeriods))
+
+        #Add groupids or hostids
+        $findVar = ($groupids + $hostids)      
+        if ( -Not $findVar ){
+            Write-Error -Message "Please make sure to set one of the groupids or hostids parameters" -ErrorAction Stop
+        }else{
+            if($groupids){
+                $cGroupids = $groupids -replace "\s"
+                $createMaintenance.params.Add("groupids",@($cGroupids))
+            }
+            if($hostids){
+                $cHostids = $hostids -replace "\s"
+                $createMaintenance.params.Add("hostids",@($cHostids))
+            }
+        }
+
+        $json = (ConvertTo-Json -InputObject $createMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+        $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+        return $res.result
+    }
+    catch {
+        $err = $error[0] | format-list -Force
+        $err
+    }
+}
+function Update-MaintenanceZabbixAPI {
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$true,position=3)][int]$MaintenanceId,
+        [Parameter(Mandatory=$false,position=4)][string]$NameMaintenance,
+        [Parameter(Mandatory=$false,position=5)][datetime]$ActiveSince,
+        [Parameter(Mandatory=$false,position=6)][datetime]$ActiveTill,
+        [Parameter(Mandatory=$false,position=7)][ValidateSet("WithData","NoData")]$MaintenanceType,
+        [Parameter(Mandatory=$false,position=8)][array]$groupids,
+        [Parameter(Mandatory=$false,position=9)][array]$hostids
+    )
+    $updateMaintenance = @{
+        "jsonrpc"="2.0";
+        "method"="maintenance.update";
+        "params"=@{
+            "maintenanceid"=$MaintenanceId
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    #name
+    if($NameMaintenance){
+        $updateMaintenance.params.add("name",$NameMaintenance)
+    }
+    #active_since
+    if($ActiveSince){
+        $AS = Get-Date $ActiveSince -UFormat %s
+        $updateMaintenance.params.add("active_since",$AS)
+    }
+    #active_till
+    if($ActiveTill){
+        $AT = Get-Date $ActiveTill -UFormat %s
+        $updateMaintenance.params.add("active_till",$AT)
+    }
+    #maintenance_type
+    if($MaintenanceType){
+        switch ($MaintenanceType) {
+            "NoData" { $mType = 1 }
+            "WithData" { $mType = 0 }
+             Default { $mType = 0 }
+        }
+        $updateMaintenance.params.add("maintenance_type",$mType)
+    }
+    #Add groupids or hostids
+    if($groupids){
+        $cGroupids = $groupids -replace "\s"
+        $updateMaintenance.params.Add("groupids",@($cGroupids))
+    }
+    if($hostids){
+        $cHostids = $hostids -replace "\s"
+        $updateMaintenance.params.Add("hostids",@($cHostids))
+    }
+
+        <#
+        #Add periods
+        $periodTimeType = 0
+        $periodEvery = 1
+        $periodMonth = 0
+        $periodDayofweek = 0
+        $periodDay = 0
+        $periodStartTime = 0
+        $Period = 31536000
+        $periodStartDate = $AS
+        $periods = @{
+            "timeperiod_type"=$periodTimeType
+            "every"=$periodEvery
+            "month"=$periodMonth
+            "dayofweek"=$periodDayofweek
+            "day"=$periodDay
+            "start_time"=$periodStartTime
+            "period"=$Period
+            "start_date"=$periodStartDate
+        }
+        $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
+        $updateMaintenance.params.Add("timeperiods",@($jsonPeriods))
+        #>
+    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+function Remove-MaintenanceZabbixAPI {
+    param (
+        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
+        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
+        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
+        [Parameter(Mandatory=$true,position=3)][array]$MaintenanceId
+    )
+
+    $deleteMaintenance = @{
+        "jsonrpc"="2.0";
+        "method"="maintenance.delete";
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+
+    $deleteMaintenance.Add("params",@($MaintenanceId -split ","))
+
+    $json = (ConvertTo-Json -InputObject $deleteMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+
+Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, New-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Set-UserZabbixAPI, Get-UserRoleZabbixAPI, Get-MaintenanceZabbixAPI, Get-MaintenanceZabbixAPI, New-MaintenanceZabbixAPI, Update-MaintenanceZabbixAPI, Remove-MaintenanceZabbixAPI
