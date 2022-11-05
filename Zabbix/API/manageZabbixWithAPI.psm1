@@ -844,7 +844,7 @@ function Get-UserRoleZabbixAPI {
 function Get-MaintenanceZabbixAPI {
     <#
     .SYNOPSIS
-        The method allows to retrieve maintenances according to the given parameters., via Zabbix API.
+        The method allows to retrieve maintenances according to the given parameters, via Zabbix API.
     .PARAMETER SelectGroups
         Return a groups property with host groups assigned to the maintenance. Example: -SelectGroups
     .PARAMETER SelectHosts
@@ -931,6 +931,22 @@ function Get-MaintenanceZabbixAPI {
     return $res.result
 }
 function New-MaintenanceZabbixAPI {
+    <#
+    .SYNOPSIS
+        This method allows to create new maintenances, via Zabbix API
+    .PARAMETER NameMaintenance
+        Name Maintenance. Example: -NameMaintenance "Maintenance_1"
+    .PARAMETER ActiveSince
+        Time when the maintenance becomes active. Example: -ActiveSince "31.10.2022 09:00"
+    .PARAMETER ActiveTill
+        Time when the maintenance stops being active. Example: -ActiveTill "22.11.2022 18:00"
+    .PARAMETER MaintenanceType
+        Type of maintenance. Possible values: WithData - (default) with data collection; NoData - without data collection. Example: -MaintenanceType NoData
+    .PARAMETER groupids
+        Host groups that will undergo maintenance. The host groups must have the groupid property defined. At least one object of groups or hosts must be specified. Example: -GroupIds "31,34,121"
+    .PARAMETER hostids
+        Hosts that will undergo maintenance.The hosts must have the hostid property defined. At least one object of groups or hosts must be specified. Example: -HostIds "13123,4456" 
+    #>
     param (
         [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
         [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
@@ -939,15 +955,14 @@ function New-MaintenanceZabbixAPI {
         [Parameter(Mandatory=$true,position=4)][datetime]$ActiveSince,
         [Parameter(Mandatory=$true,position=5)][datetime]$ActiveTill,
         [Parameter(Mandatory=$false,position=6)][ValidateSet("WithData","NoData")]$MaintenanceType,
-        [Parameter(Mandatory=$false,position=7)][array]$groupids,
-        [Parameter(Mandatory=$false,position=8)][array]$hostids
+        [Parameter(Mandatory=$false,position=7)][array]$GroupIds,
+        [Parameter(Mandatory=$false,position=8)][array]$HostIds
     )
 
     try {  
         $ErrorActionPreference = "Stop"
         $AS = Get-Date $ActiveSince -UFormat %s
         $AT = Get-Date $ActiveTill -UFormat %s
-        $periodStartDate = $AS
 
         switch ($MaintenanceType) {
             "NoData" { $mType = 1 }
@@ -976,6 +991,7 @@ function New-MaintenanceZabbixAPI {
         $periodDay = 0
         $periodStartTime = 0
         $Period = 31536000
+        $periodStartDate = $AS
         $periods = @{
             "timeperiod_type"=$periodTimeType
             "every"=$periodEvery
@@ -990,16 +1006,16 @@ function New-MaintenanceZabbixAPI {
         $createMaintenance.params.Add("timeperiods",@($jsonPeriods))
 
         #Add groupids or hostids
-        $findVar = ($groupids + $hostids)      
+        $findVar = ($GroupIds + $HostIds)      
         if ( -Not $findVar ){
             Write-Error -Message "Please make sure to set one of the groupids or hostids parameters" -ErrorAction Stop
         }else{
-            if($groupids){
-                $cGroupids = $groupids -replace "\s"
+            if($GroupIds){
+                $cGroupids = $GroupIds -replace "\s"
                 $createMaintenance.params.Add("groupids",@($cGroupids))
             }
-            if($hostids){
-                $cHostids = $hostids -replace "\s"
+            if($HostIds){
+                $cHostids = $HostIds -replace "\s"
                 $createMaintenance.params.Add("hostids",@($cHostids))
             }
         }
