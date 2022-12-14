@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.4
+#Version 1.0.0.5
 #OS Platform
 function GetOS {
     if ( $PSVersionTable.PSVersion.Major -le "5" ) {   
@@ -325,4 +325,36 @@ function Add-GrafPermissionsDashboard {
     return $return
 }
 
-Export-ModuleMember -Function Get-GrafTeams, Get-GrafTeamMembers, Add-GrafTeamMembers, New-GrafTeam, Get-GrafUsers, Get-GrafUser, Get-GrafUserTeams, Get-GrafFoldersAndDashboards, Get-GrafPermissionsDashboard, Add-GrafPermissionsDashboard
+#Grontend Settings
+function Get-GrafFrontendSettings {
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url
+        )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+    $createDatasourceUri = "$Url/api/frontend/settings"
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
+    Switch (GetOS){
+        Win32NT { return (Invoke-RestMethod @datasourceParameters) }
+        Unix { return (Invoke-RestMethod @datasourceParameters -SkipCertificateCheck) }
+        }
+}
+
+#Grafana Health
+function Get-GrafHealth {
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url
+        )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+    $createDatasourceUri = "$Url/api/health"
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
+    Switch (GetOS){
+        Win32NT { return (Invoke-RestMethod @datasourceParameters) }
+        Unix { return (Invoke-RestMethod @datasourceParameters -SkipCertificateCheck) }
+        }
+}
+
+Export-ModuleMember -Function Get-GrafTeams, Get-GrafTeamMembers, Add-GrafTeamMembers, New-GrafTeam, Get-GrafUsers, Get-GrafUser, Get-GrafUserTeams, Get-GrafFoldersAndDashboards, Get-GrafPermissionsDashboard, Add-GrafPermissionsDashboard, Get-GrafFrontendSettings, Get-GrafHealth
