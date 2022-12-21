@@ -1,6 +1,7 @@
 #!/bin/pwsh
 
 #Version 1.0.0.1
+#It Simple
 function manageZabbixTemplateJSONtoCSV {
     param (
         [Parameter(Mandatory=$true)][string]$InputFile,
