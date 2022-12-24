@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.1
+#Version 1.0.0.2
 #with MACROS
 function manageZabbixTemplateJSONtoCSV {
     param (
@@ -15,37 +15,35 @@ function manageZabbixTemplateJSONtoCSV {
     $templateJSONName = $templateJSON.name
     $templateJSONMacros = $templateJSON.macros
 
-    #Замена значения макроса в строке. Replacing the macro value in a string
+    #Replacing the macro value in a string
     function replacingMacroValueString {
         param (
             [Parameter(Mandatory=$false)][string]$stringInput
         )
-        $strInput = $stringInput -replace "{$"," {$" -replace "}","} "
-        $strWork = $strInput
-        $strMacros = "{`$*.*}"
-        #Находим Макросы используемые в тексте.
-        $strSplit = @($strWork -replace "{\$"," {$" -split " ") | Where-Object { $_ -like $strMacros }
-        #Подготовка строки для поиска, удаляем из Макроса { и } и $
-        $resChangeMacro0 = $strWork -replace "{\$","" -replace "}","" -replace "{"," "
+        $strWork = $stringInput
+        #We find Macros used in the text.
+        $strSplit = @($strWork -replace "{\$"," {$" -replace "}","} " -split " ") | Where-Object { $_ -like "{`$*.*}" }
         
-        #Создаем массив и добавлем первую строку для изменения
-        $arrMacrosValue = @($resChangeMacro0)
+        #Create an array and add the first line to change
+        $arrMacrosValue = @($strWork)
         foreach ( $fMacrosValue in $strSplit ){
-            #Подготовка макроса для поиска, удаляем из Макроса { и } и $
+            #Preparing the macro for the search, removing from the Macro { and } and $
             $resChangeMacro1 = $fMacrosValue -replace "{","" -replace "}","" -replace "\$","" -replace ":.*",""
+            
+            #Searching for a value macro in a JSON macro array
             $finChangeMacro1 = ("{$"+$resChangeMacro1+"}")
-            #Поиск value макроса в массиве макросов JSON
             $resChangeMacro_2 = ($templateJSONMacros | Where-Object { $_.macro -like $finChangeMacro1 })
-            $resChangeMacro2 = ( $resChangeMacro_2.macro +"="+ $resChangeMacro_2.value )
-            #Выбираем последние значение из массива и изменяем строку
+            $resChangeMacro2 = ( $resChangeMacro_2.macro +" = "+ $resChangeMacro_2.value ) -replace "{\$" -replace "}"
+
+            #Select the last value from the array and change the string
             $resChangeMacro3 = $arrMacrosValue[$arrMacrosValue.Count -1] -replace "$resChangeMacro1","$resChangeMacro2"
-            #Добавляем в массив
+            #Adding to the array
             $arrMacrosValue += $resChangeMacro3 
         }
-        $arrMacrosValue[$arrMacrosValue.Count -1]
+        return $arrMacrosValue[$arrMacrosValue.Count -1]
     }
 
-    ###Item
+    ###Create a table with an Item
     $itemsJSON = $templateJSON.items
     $itemsWork = $itemsJSON | Select-Object @{n="Template";e={"Item"}}, `
         @{n="DiscoveryName";e="null"}, `
@@ -61,7 +59,7 @@ function manageZabbixTemplateJSONtoCSV {
         @{n="TriggersPriority";e={$_.triggers.priority}}, `
         @{n="TriggersDescription";e={$_.triggers.description}}
 
-    ###Discovery
+    ###Create a table with an Discovery
     $createArrDiscover = @(New-Object psobject -Property @{
         Template = "Discovery";
         DiscoveryName = "";
@@ -77,10 +75,11 @@ function manageZabbixTemplateJSONtoCSV {
         TriggersPriority = "";
         TriggersDescription = ""
     })
-
+    
+    #We work with each detection rule
     $discoveryJSON = $templateJSON.discovery_rules
     foreach ( $oneDiscoveryJSON in $discoveryJSON ) {
-
+        #Adding the found elements of the discovery rule to the discovery table.
         $fOneDiscoveryJSON = @(New-Object psobject -Property @{
             Template="Discovery";
             DiscoveryName = $oneDiscoveryJSON.name;
@@ -96,9 +95,11 @@ function manageZabbixTemplateJSONtoCSV {
             }
         )
         $createArrDiscover += $fOneDiscoveryJSON 
-
+        
+        #Adding all the elements , triggers present in the discovery rule to the discovery table.
         foreach ( $oneItemDiscoverJSON in $OneDiscoveryJSON.item_prototypes ) {   
-            #Length
+            #Length. We find out how many triggers have been created for one element, 
+            #this is necessary to record data for each element and its trigger in the discovery table
             if ( $oneItemDiscoverJSON.trigger_prototypes){
                 $length = @($oneItemDiscoverJSON.trigger_prototypes.name).Length -1
             } else { $length = 0 }
@@ -153,12 +154,10 @@ function manageZabbixTemplateJSONtoCSV {
                     TriggersDescription = "$TriggerDescription"
                     }
                 )
-                #$fOneItemDiscoverJSON
                 $createArrDiscover += $fOneItemDiscoverJSON
             }
         }
     }
-
     $itemsWork += $createArrDiscover
     $itemsWork | Export-Csv -Path "$OutputFile\$templateJSONName.csv" -Encoding utf8 -Delimiter ";" -Append
 }
