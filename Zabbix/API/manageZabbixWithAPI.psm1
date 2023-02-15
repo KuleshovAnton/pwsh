@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.6
+#Version 1.0.0.7
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -21,28 +21,29 @@ function Connect-ZabbixAPI {
         Connect-ZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -User UserAdmin -TokenId 2 -inPasswd "Passw0rd"
     #>
     param(
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$User,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3,ParameterSetName="Passwd")]$inPasswd
-        )
-        if ( $inPasswd ) {
-            $str = $inPasswd
-        } else {
-            $passwdAdmin = Read-Host "Enter password" -AsSecureString
-            $Ptr=[System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($passwdAdmin)
-            $str=[System.Runtime.InteropServices.Marshal]::PtrToStringUni($Ptr)
-        } 
-        #Create token for connection Zabbix API.
-        $data = @{
-            "jsonrpc"="2.0";
-            "method"="user.login";
-            "params"=@{
-                "user"=$User;
-                "password"=$str;
-            };
-            "id"=$TokenId
-        }
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$User,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3, ParameterSetName = "Passwd")]$inPasswd
+    )
+    if ( $inPasswd ) {
+        $str = $inPasswd
+    }
+    else {
+        $passwdAdmin = Read-Host "Enter password" -AsSecureString
+        $Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($passwdAdmin)
+        $str = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($Ptr)
+    } 
+    #Create token for connection Zabbix API.
+    $data = @{
+        "jsonrpc" = "2.0";
+        "method"  = "user.login";
+        "params"  = @{
+            "user"     = $User;
+            "password" = $str;
+        };
+        "id"      = $TokenId
+    }
     $token = (Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body ($data | ConvertTo-Json) -ContentType "application/json;charset=UTF-8")
     return $token
 }
@@ -59,33 +60,33 @@ function Get-HostGroupsZabbixAPI {
         Get-HostGroupsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 | Format-Table
 
     #>
-        param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][array]$filterGroupName
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][array]$filterGroupName
     )
     $getGroup = @{
-        "jsonrpc"="2.0";
-        "method"="hostgroup.get";
-        "params" = @{
-            "output"="extend";
+        "jsonrpc" = "2.0";
+        "method"  = "hostgroup.get";
+        "params"  = @{
+            "output" = "extend";
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
     #Filter
-    if($filterGroupName){
+    if ($filterGroupName) {
         $arrGp = @()
         foreach ( $oneGp in ($filterGroupName -split ",") ) {
-            $oneResGP = ('"'+ $oneGp +'"')
-            $arrGp  += $oneResGP
+            $oneResGP = ('"' + $oneGp + '"')
+            $arrGp += $oneResGP
         }
         $addGp = $arrGp -join ","
-        $filterName = @{"name"= @("[$addGp]")}
-        $getGroup.params.Add("filter",$filterName)
+        $filterName = @{"name" = @("[$addGp]") }
+        $getGroup.params.Add("filter", $filterName)
     }  
-    $json = (ConvertTo-Json -InputObject $getGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $getGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
@@ -99,33 +100,33 @@ function Get-HostsZabbixAPI {
         Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 | Format-Table
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][string]$filterHostName
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][string]$filterHostName
     )
     $getHost = @{
-        "jsonrpc"="2.0";
-        "method"="host.get";
-        "params"=@{
-            "output"="extend"
-            "selectGroups"="extend"     #Group member
-            };
-        "auth" = $TokenApi;
-        "id" = $TokenId;
+        "jsonrpc" = "2.0";
+        "method"  = "host.get";
+        "params"  = @{
+            "output"       = "extend"
+            "selectGroups" = "extend"     #Group member
+        };
+        "auth"    = $TokenApi;
+        "id"      = $TokenId;
     }
     #Filter
-    if($filterHostName){
+    if ($filterHostName) {
         $arrHS = @()
         foreach ( $oneHS in ($filterHostName -split ",") ) {
-            $oneResHS = ('"'+ $oneHS +'"')
+            $oneResHS = ('"' + $oneHS + '"')
             $arrHS += $oneResHS
         }
         $addHS = $arrHS -join ","
-        $filterName = @{"host"=@("[$addHS ]")}
-        $getHost.params.Add("filter",$filterName)
+        $filterName = @{"host" = @("[$addHS ]") }
+        $getHost.params.Add("filter", $filterName)
     }
-    $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     $res.result
 }
@@ -206,218 +207,253 @@ function New-HostZabbixAPI {
         New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "host" -IP "192.168.1.2" -DNS "host.domain.info" -Group_HostId 2 -Use_Agent -Use_SNMPv2 -SNMPv2_community "public" -Use_IPMI -Tags "srv:SERVER,subsys:LINUX"
     #>
     param(
-        [Parameter(Mandatory=$true, position=0)][string]$UrlApi,                                                 #URL Zabbix API.
-        [Parameter(Mandatory=$true, position=1)][string]$TokenApi,                                               #User Token Zabbix API.
-        [Parameter(Mandatory=$true, position=2)][int]$TokenId,                                                   #User ID Zabbix API.
-        [Parameter(Mandatory=$true, position=3)][string]$HostName,                                               #Host Name.
-        [Parameter(Mandatory=$true, position=4)][ValidatePattern("\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b")]$IP,  #Host IP address.
-        [Parameter(Mandatory=$true, position=5)][string]$DNS,                                                    #Host DNS Name.
-        [Parameter(Mandatory=$true, position=6)][array]$Group_HostId,                                            #Group Host ID.
-        [Parameter(Mandatory=$false,position=7)][int]$Proxy_HostId,                                              #Proxy Host ID.
-        [Parameter(Mandatory=$false,position=8)][switch]$Use_Agent, 
-        [Parameter(Mandatory=$false,position=9)][switch]$Use_IP_Agent,
-        [Parameter(Mandatory=$false,position=10)][switch]$Use_SNMPv2,
-        [Parameter(Mandatory=$false,position=11)][switch]$Use_SNMPv3,
-        [Parameter(Mandatory=$false,position=12)][string]$SNMPv2_community,
-        [Parameter(Mandatory=$false,position=13)][string]$SNMPv3_securityname,
-        [Parameter(Mandatory=$false,position=14)][ValidateSet("noAuthNoPriv","authNoPriv","authPriv")]$SNMPv3_securitylevel,
-        [Parameter(Mandatory=$false,position=15)][ValidateSet("MD5","SHA1","SHA224","SHA256","SHA384","SHA512")]$SNMPv3_authprotocol,
-        [Parameter(Mandatory=$false,position=16)][string]$SNMPv3_authpassphrase,
-        [Parameter(Mandatory=$false,position=17)][ValidateSet("DES","AES128","AES192","AES256","AES192C","AES256C")]$SNMPv3_privprotocol,
-        [Parameter(Mandatory=$false,position=18)][string]$SNMPv3_privpassphrase,
-        [Parameter(Mandatory=$false,position=19)][switch]$Use_IP_SNMP,
-        [Parameter(Mandatory=$false,position=20)][switch]$Use_IPMI, 
-        [Parameter(Mandatory=$false,position=21)][switch]$Use_IP_IPMI,
-        [Parameter(Mandatory=$false,position=22)][string]$Tags,                                                 #Tags Host.
-        [Parameter(Mandatory=$false,position=23)][array]$TemplateId,                                            #Template.
-        [Parameter(Mandatory=$false,position=24)][ValidateSet("Manual","Auto")]$Inventory_Mode                  #Enable Inventory data.
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi, #URL Zabbix API.
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi, #User Token Zabbix API.
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId, #User ID Zabbix API.
+        [Parameter(Mandatory = $true, position = 3)][string]$HostName, #Host Name.
+        [Parameter(Mandatory = $true, position = 4)][ValidatePattern("\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b")]$IP, #Host IP address.
+        [Parameter(Mandatory = $true, position = 5)][string]$DNS, #Host DNS Name.
+        [Parameter(Mandatory = $true, position = 6)][array]$Group_HostId, #Group Host ID.
+        [Parameter(Mandatory = $false, position = 7)][int]$Proxy_HostId, #Proxy Host ID.
+        [Parameter(Mandatory = $false, position = 8)][switch]$Use_Agent, 
+        [Parameter(Mandatory = $false, position = 9)][switch]$Use_IP_Agent,
+        [Parameter(Mandatory = $false, position = 10)][switch]$Use_SNMPv2,
+        [Parameter(Mandatory = $false, position = 11)][switch]$Use_SNMPv3,
+        [Parameter(Mandatory = $false, position = 12)][string]$SNMPv2_community,
+        [Parameter(Mandatory = $false, position = 13)][string]$SNMPv3_securityname,
+        [Parameter(Mandatory = $false, position = 14)][ValidateSet("noAuthNoPriv", "authNoPriv", "authPriv")]$SNMPv3_securitylevel,
+        [Parameter(Mandatory = $false, position = 15)][ValidateSet("MD5", "SHA1", "SHA224", "SHA256", "SHA384", "SHA512")]$SNMPv3_authprotocol,
+        [Parameter(Mandatory = $false, position = 16)][string]$SNMPv3_authpassphrase,
+        [Parameter(Mandatory = $false, position = 17)][ValidateSet("DES", "AES128", "AES192", "AES256", "AES192C", "AES256C")]$SNMPv3_privprotocol,
+        [Parameter(Mandatory = $false, position = 18)][string]$SNMPv3_privpassphrase,
+        [Parameter(Mandatory = $false, position = 19)][switch]$Use_IP_SNMP,
+        [Parameter(Mandatory = $false, position = 20)][switch]$Use_IPMI, 
+        [Parameter(Mandatory = $false, position = 21)][switch]$Use_IP_IPMI,
+        [Parameter(Mandatory = $false, position = 22)][string]$Tags, #Tags Host.
+        [Parameter(Mandatory = $false, position = 23)][array]$TemplateId, #Template.
+        [Parameter(Mandatory = $false, position = 24)][ValidateSet("Manual", "Auto")]$Inventory_Mode                  #Enable Inventory data.
     )
     ###Interface #######################################
     ##Agent Interfaces##
-    if ( $Use_Agent ){
+    if ( $Use_Agent ) {
         #Use SNMP protocol for management Host.#Should the connection be made via an IP address.
         if ( $Use_IP_Agent ) { 
             $useipAgent = 1 
-        } else { 
+        }
+        else { 
             $useipAgent = 0 
         }
         $interfacesAgent = @{
-            "type"=1;
-            "main"=1;
-            "useip"=$useipAgent;
-            "ip"=$IP;
-            "dns"=$DNS;
-            "port"="10050"
+            "type"  = 1;
+            "main"  = 1;
+            "useip" = $useipAgent;
+            "ip"    = $IP;
+            "dns"   = $DNS;
+            "port"  = "10050"
         }
-        $jsonAgent = (ConvertTo-Json -InputObject $interfacesAgent) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
+        $jsonAgent = (ConvertTo-Json -InputObject $interfacesAgent) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
     }
     ##SNMP Interfaces##
-    if ( $Use_SNMPv2 -or $Use_SNMPv3 ){
+    if ( $Use_SNMPv2 -or $Use_SNMPv3 ) {
         #Use SNMP protocol for management Host.#Should the connection be made via an IP address.
-        if ( $Use_ip_SNMP ){ 
+        if ( $Use_ip_SNMP ) { 
             $useipSNMP = 1 
-        }else { 
+        }
+        else { 
             $useipSNMP = 0 
         }
         $interfacesSNMP = @{
-            "type"=2;
-            "main"=1;
-            "useip"=$useipSNMP;
-            "ip"=$ip;
-            "dns"=$dns;
-            "port"="161";
+            "type"  = 2;
+            "main"  = 1;
+            "useip" = $useipSNMP;
+            "ip"    = $ip;
+            "dns"   = $dns;
+            "port"  = "161";
         }
        
         #Do not use SNMPv2 and SNMPv3.
-        if( $Use_SNMPv2 -and $Use_SNMPv3 ){
+        if ( $Use_SNMPv2 -and $Use_SNMPv3 ) {
             Write-Error "Simultaneous use of SNMPv2 and SNMPv3 is not allowed. Please use only one version of the SNMP protocol."
         }
         #Use SNMP v2.
-        elseif( $Use_SNMPv2 ){
+        elseif ( $Use_SNMPv2 ) {
             if ( $SNMPv2_community -match "\{\$.*\}" ) {
-                $community = ('"""'+ $SNMPv2_community +'"""')
-            } else {
-                $community = ('"'+ $SNMPv2_community +'"')
+                $community = ('"""' + $SNMPv2_community + '"""')
+            }
+            else {
+                $community = ('"' + $SNMPv2_community + '"')
             } 
-            $detailsSNMP = ( '"version":2,"bulk":1,"community":'+ $community )
+            $detailsSNMP = ( '"version":2,"bulk":1,"community":' + $community )
         }
         #Use SNMP v3.
-        elseif( $Use_SNMPv3 ){
+        elseif ( $Use_SNMPv3 ) {
             #securitylevel
-            switch ($SNMPv3_securitylevel){
-                "noAuthNoPriv"  { $sLevel = 0 }
-                "authNoPriv"    { $sLevel = 1 }
-                "authPriv"      { $sLevel = 2 }
+            switch ($SNMPv3_securitylevel) {
+                "noAuthNoPriv" { $sLevel = 0 }
+                "authNoPriv" { $sLevel = 1 }
+                "authPriv" { $sLevel = 2 }
             }
             #authprotocol
-            switch ($SNMPv3_authprotocol){
-               "MD5"    { $aProtocol = 0 }
-               "SHA1"   { $aProtocol = 1 }
-               "SHA224" { $aProtocol = 2 }
-               "SHA256" { $aProtocol = 3 }
-               "SHA384" { $aProtocol = 4 }
-               "SHA512" { $aProtocol = 5 }
+            switch ($SNMPv3_authprotocol) {
+                "MD5" { $aProtocol = 0 }
+                "SHA1" { $aProtocol = 1 }
+                "SHA224" { $aProtocol = 2 }
+                "SHA256" { $aProtocol = 3 }
+                "SHA384" { $aProtocol = 4 }
+                "SHA512" { $aProtocol = 5 }
             }
             #privprotocol
-            switch ($SNMPv3_privprotocol){
-                "DES"       { $pProtocol = 0 }
-                "AES128"    { $pProtocol = 1 }
-                "AES192"    { $pProtocol = 2 }
-                "AES256"    { $pProtocol = 3 }
-                "AES192C"   { $pProtocol = 4 }
-                "AES256C"   { $pProtocol = 5 }
+            switch ($SNMPv3_privprotocol) {
+                "DES" { $pProtocol = 0 }
+                "AES128" { $pProtocol = 1 }
+                "AES192" { $pProtocol = 2 }
+                "AES256" { $pProtocol = 3 }
+                "AES192C" { $pProtocol = 4 }
+                "AES256C" { $pProtocol = 5 }
             }
-            if ($SNMPv3_securityname -match "\{\$.*\}"){
-                $securityname = ('"securityname":"""'+ $SNMPv3_securityname +'"""')
-            } else {  $securityname = ('"securityname":"'+ $SNMPv3_securityname +'"') }
-            if ($SNMPv3_authpassphrase -match "\{\$.*\}"){
-                $authpassphrase = ('"authpassphrase":"""'+ $SNMPv3_authpassphrase +'"""')
-            } else { $authpassphrase = ('"authpassphrase":"'+ $SNMPv3_authpassphrase +'"') }
-            if ($SNMPv3_privpassphrase -match "\{\$.*\}"){
-                $privpassphrase = ('"privpassphrase":"""'+ $SNMPv3_privpassphrase +'"""')
-            } else { $privpassphrase = ('"privpassphrase":"'+ $SNMPv3_privpassphrase +'"') }
-            $detailsSNMP = ( '"version":3,"bulk":1,"contextname":"","securitylevel":'+ $sLevel +',"authprotocol":'+ $aProtocol +',"privprotocol":'+ $pProtocol +','+ $securityname +","+ $authpassphrase +","+ $privpassphrase)
+            if ($SNMPv3_securityname -match "\{\$.*\}") {
+                $securityname = ('"securityname":"""' + $SNMPv3_securityname + '"""')
+            }
+            else { $securityname = ('"securityname":"' + $SNMPv3_securityname + '"') }
+            if ($SNMPv3_authpassphrase -match "\{\$.*\}") {
+                $authpassphrase = ('"authpassphrase":"""' + $SNMPv3_authpassphrase + '"""')
+            }
+            else { $authpassphrase = ('"authpassphrase":"' + $SNMPv3_authpassphrase + '"') }
+            if ($SNMPv3_privpassphrase -match "\{\$.*\}") {
+                $privpassphrase = ('"privpassphrase":"""' + $SNMPv3_privpassphrase + '"""')
+            }
+            else { $privpassphrase = ('"privpassphrase":"' + $SNMPv3_privpassphrase + '"') }
+            $detailsSNMP = ( '"version":3,"bulk":1,"contextname":"","securitylevel":' + $sLevel + ',"authprotocol":' + $aProtocol + ',"privprotocol":' + $pProtocol + ',' + $securityname + "," + $authpassphrase + "," + $privpassphrase)
         }
-        $interfacesSNMP.Add("details",("{$detailsSNMP}"))
+        $interfacesSNMP.Add("details", ("{$detailsSNMP}"))
         $jsonInterfacesSNMP = $interfacesSNMP
-        $jsonSNMP = (ConvertTo-Json -InputObject $jsonInterfacesSNMP) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
+        $jsonSNMP = (ConvertTo-Json -InputObject $jsonInterfacesSNMP) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
     }
     ##IPMI Interfaces##
-    if ( $Use_IPMI ){
+    if ( $Use_IPMI ) {
         #Use SNMP protocol for management Host.#Should the connection be made via an IP address.
         if ( $Use_ip_IPMI ) { $useipIPMI = 1 }
         else { $useipIPMI = 0 }
 
         $interfacesIPMI = @{
-            "type"=3;
-            "main"=1;
-            "useip"=$useipIPMI;
-            "ip"=$ip;
-            "dns"=$dns;
-            "port"="623"
+            "type"  = 3;
+            "main"  = 1;
+            "useip" = $useipIPMI;
+            "ip"    = $ip;
+            "dns"   = $dns;
+            "port"  = "623"
         }
-        $jsonIPMI = (ConvertTo-Json -InputObject $interfacesIPMI) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
+        $jsonIPMI = (ConvertTo-Json -InputObject $interfacesIPMI) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
     }
     #If not Variable $Use_Agent, $Use_SNMP, $Use_IPMI. Is used default Zabbix Agent.
-    if ( -not $Use_Agent -and -not $Use_SNMPv2 -and -not $Use_SNMPv3 -and -not $Use_IPMI ){
+    if ( -not $Use_Agent -and -not $Use_SNMPv2 -and -not $Use_SNMPv3 -and -not $Use_IPMI ) {
         #Use SNMP protocol for management Host.#Should the connection be made via an IP address.
         if ( $Use_IP_Agent ) { $useipAgent = 1 }
         else { $useipAgent = 0 }
         $interfacesAgent = @{
-            "type"=1;
-            "main"=1;
-            "useip"=$useipAgent;
-            "ip"=$IP;
-            "dns"=$DNS;
-            "port"="10050"
+            "type"  = 1;
+            "main"  = 1;
+            "useip" = $useipAgent;
+            "ip"    = $IP;
+            "dns"   = $DNS;
+            "port"  = "10050"
         }
-        $jsonAgent = (ConvertTo-Json -InputObject $interfacesAgent) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
+        $jsonAgent = (ConvertTo-Json -InputObject $interfacesAgent) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
     }
     ###Interface End####################################
     ###Create Host JSON#################################
     $createHost = @{
-        "jsonrpc"="2.0";
-        "method"="host.create";
-        "params"=@{
-            "host"=$hostName;
+        "jsonrpc" = "2.0";
+        "method"  = "host.create";
+        "params"  = @{
+            "host" = $hostName;
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId;
+        "auth"    = $TokenApi;
+        "id"      = $TokenId;
     }
     #Add Group Host to JSON.
     $arrGroupId = @()
     foreach ( $oneGroupId in ($group_HostId -split ",") ) {
-        $resGroupId = ( '{"groupid":"'+ $oneGroupId +'"}' )
+        $resGroupId = ( '{"groupid":"' + $oneGroupId + '"}' )
         $arrGroupId += $resGroupId
     }
     $addGroupId = $arrGroupId -join ","
-    $createHost.params.Add("groups",@($addGroupId))
+    $createHost.params.Add("groups", @($addGroupId))
     #Add interfaces Host to JSON.
     $joinJsonInterface = @()
-    if ( $jsonAgent) { $joinJsonInterface += $jsonAgent}
+    if ( $jsonAgent) { $joinJsonInterface += $jsonAgent }
     if ( $jsonSNMP ) { $joinJsonInterface += $jsonSNMP }
     if ( $jsonIPMI ) { $joinJsonInterface += $jsonIPMI }
     [string]$joinJsonInterfaceAdd = $joinJsonInterface -join ","
-    $createHost.params.Add("interfaces",@($joinJsonInterfaceAdd))
+    $createHost.params.Add("interfaces", @($joinJsonInterfaceAdd))
     #Add Tags Host to JSON.
-    if ($Tags){
+    if ($Tags) {
         $arrTags = @()
         foreach ( $oneTag in ($Tags -split ",") ) {
             $oTag = $oneTag -split ":"
-            $resTag = ( '{"tag":"'+ $oTag[0] +'","value":"'+ $oTag[1] +'"}' )
+            $resTag = ( '{"tag":"' + $oTag[0] + '","value":"' + $oTag[1] + '"}' )
             $arrTags += $resTag
         }
         $addTags = $arrTags -join ","
-        $createHost.params.Add("tags",@($addTags))
+        $createHost.params.Add("tags", @($addTags))
     }     
     #Add Zabbix Proxy Host to JSON.
-    if ($Proxy_HostId){
-        $createHost.params.Add("proxy_hostid",$Proxy_HostId)
+    if ($Proxy_HostId) {
+        $createHost.params.Add("proxy_hostid", $Proxy_HostId)
     }
     #Add template to JSON.
-    if($TemplateId){
+    if ($TemplateId) {
         $arrTemplateId = @()
         foreach ( $oneTemplateId in ($TemplateId -split ",") ) {
-            $resTemplateId = ( '{"templateid":"'+ $oneTemplateId +'"}' )
+            $resTemplateId = ( '{"templateid":"' + $oneTemplateId + '"}' )
             $arrTemplateId += $resTemplateId
         }
         $addTemplateId = $arrTemplateId -join ","
-        $createHost.params.Add("templates",@($addTemplateId))
+        $createHost.params.Add("templates", @($addTemplateId))
     }
     #Add Inventory to JSON.
-    if($Inventory_Mode){
+    if ($Inventory_Mode) {
         switch ($Inventory_Mode) {
             "Manual" { [int]$InvMode = 0 }
-            "Auto"   { [int]$InvMode = 1 }
+            "Auto" { [int]$InvMode = 1 }
         }
-        $createHost.params.Add("inventory_mode",$InvMode)
+        $createHost.params.Add("inventory_mode", $InvMode)
     } 
     $jsonCreate = $createHost
-    $json = (ConvertTo-Json -InputObject $jsonCreate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '\["{','[{' -replace '}"\]','}]' -replace '"{','{' -replace '}"','}'
+    $json = (ConvertTo-Json -InputObject $jsonCreate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '\["{', '[{' -replace '}"\]', '}]' -replace '"{', '{' -replace '}"', '}'
     ###Create Host JSON END###############################
     ###Create Host########################################
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
+}
+
+function Remove-HostsZabbixAPI {
+    <#
+    .Example
+        #Output only the groups you are looking for.
+        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterHostName '"cgraf1,cgraf2"' | Format-Table
+        #Output all groups.
+        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 | Format-Table
+    #>
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][array]$HostsID
+    )
+
+    $hostIdApi = $HostsID -split "," -replace '^','"' -replace '$','"' -join ","
+    $removeHost = @{
+        "jsonrpc" = "2.0";
+        "method"  = "host.delete";
+        "params"  = @($hostIdApi);
+        "auth"    = $TokenApi;
+        "id"      = $TokenId;
+    }
+
+    $json = (ConvertTo-Json -InputObject $removeHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
+    $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    $res.result
 }
 
 #########################################
@@ -431,35 +467,35 @@ function Get-TemplateZabbixAPI {
         #Output only the Template you are looking for.
         Get-TemplateZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterTemplateName  "Linux by Zabbix agent,Template 1"
    #>
-   param (
-       [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-       [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-       [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-       [Parameter(Mandatory=$false,position=3)][array]$filterTemplateName
-   )
-   $getTemplate = @{
-       "jsonrpc"="2.0";
-       "method"="template.get";
-       "params" = @{
-           "output"="extend";
-       };
-       "auth" = $TokenApi;
-       "id" = $TokenId
-   }
-   #Filter
-   if($filterTemplateName){
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][array]$filterTemplateName
+    )
+    $getTemplate = @{
+        "jsonrpc" = "2.0";
+        "method"  = "template.get";
+        "params"  = @{
+            "output" = "extend";
+        };
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
+    }
+    #Filter
+    if ($filterTemplateName) {
         $arrTm = @()
         foreach ( $oneTm in ($filterTemplateName -split ",") ) {
-            $oneResTm = ('"'+ $oneTm +'"')
-            $arrTm  += $oneResTm
+            $oneResTm = ('"' + $oneTm + '"')
+            $arrTm += $oneResTm
         }
         $addTm = $arrTm -join ","
-        $filterName = @{"host"= @("[$addTm]")}
-        $getTemplate.params.Add("filter",$filterName)
+        $filterName = @{"host" = @("[$addTm]") }
+        $getTemplate.params.Add("filter", $filterName)
     }
-   $json = (ConvertTo-Json -InputObject $getTemplate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
-   $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-   return $res.result
+    $json = (ConvertTo-Json -InputObject $getTemplate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
 }
 
 #########################################
@@ -480,72 +516,72 @@ function Get-UserGroupZabbixAPI {
         Get-UserGroupZabbixAPI "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -filterUserGroup "Group1,Group2" -IncomingUsers -ReturnRights
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][array]$filterUserGroup,
-        [Parameter(Mandatory=$false,position=4)][switch]$IncomingUsers,
-        [Parameter(Mandatory=$false,position=5)][switch]$ReturnRights
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][array]$filterUserGroup,
+        [Parameter(Mandatory = $false, position = 4)][switch]$IncomingUsers,
+        [Parameter(Mandatory = $false, position = 5)][switch]$ReturnRights
     )
     $getUserGroup = @{
-        "jsonrpc"="2.0";
-        "method"="usergroup.get";
-        "params"=@{
-            "output"="extend";       
-            "status"=0
+        "jsonrpc" = "2.0";
+        "method"  = "usergroup.get";
+        "params"  = @{
+            "output" = "extend";       
+            "status" = 0
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
     #Filter
-    if($filterUserGroup){
+    if ($filterUserGroup) {
         $arrUSGP = @()
         foreach ( $oneUSGP in ($filterUserGroup -split ",") ) {
-            $oneResUSGP = ('"'+ $oneUSGP +'"')
-            $arrUSGP  += $oneResUSGP
+            $oneResUSGP = ('"' + $oneUSGP + '"')
+            $arrUSGP += $oneResUSGP
         }
         $addUSGP = $arrUSGP -join ","
-        $filterName = @{"name"= @("[$addUSGP]")}
-        $getUserGroup.params.Add("filter",$filterName)
+        $filterName = @{"name" = @("[$addUSGP]") }
+        $getUserGroup.params.Add("filter", $filterName)
     }
     #Members of the group.
-    If($IncomingUsers){
-        $getUserGroup.params.Add("selectUsers","extend")
+    If ($IncomingUsers) {
+        $getUserGroup.params.Add("selectUsers", "extend")
     }
     #Return permissions for a group of hosts. permission - the level of access rights to a group of hosts; id - ID of the host group.
-    If($ReturnRights){
-        $getUserGroup.params.Add("selectRights","extend")
+    If ($ReturnRights) {
+        $getUserGroup.params.Add("selectRights", "extend")
     }
-    $json = (ConvertTo-Json -InputObject $getUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $getUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
 function New-UserGroupZabbixAPI {
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][string]$NewUserGroup,
-        [Parameter(Mandatory=$true,position=4)][ValidateSet("SysDefault","Internal","LDAP","NotFrontend")]$GuiAccess
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][string]$NewUserGroup,
+        [Parameter(Mandatory = $true, position = 4)][ValidateSet("SysDefault", "Internal", "LDAP", "NotFrontend")]$GuiAccess
     )
     switch ($GuiAccess) {
-        "SysDefault"    { $gAccess = 0 }
-        "Internal"      { $gAccess = 1 }
-        "LDAP"          { $gAccess = 2 }
-        "NotFrontend"   { $gAccess = 3 }
+        "SysDefault" { $gAccess = 0 }
+        "Internal" { $gAccess = 1 }
+        "LDAP" { $gAccess = 2 }
+        "NotFrontend" { $gAccess = 3 }
     }
     $createUserGroup = @{
-        "jsonrpc"="2.0";
-        "method"="usergroup.create";
-        "params"=@{
-            "name"="$NewUserGroup";
-            "gui_access"=$gAccess;
-            "users_status"=0
+        "jsonrpc" = "2.0";
+        "method"  = "usergroup.create";
+        "params"  = @{
+            "name"         = "$NewUserGroup";
+            "gui_access"   = $gAccess;
+            "users_status" = 0
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
-    $json = (ConvertTo-Json -InputObject $createUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $createUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
 }
@@ -570,47 +606,47 @@ function Get-UserZabbixAPI {
         Get-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -filterUser "User1,User2" -SelectMedias -SelectMediaTypes -SelectUsrGrps
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][array]$filterUser,
-        [Parameter(Mandatory=$false,position=4)][switch]$SelectMedias,
-        [Parameter(Mandatory=$false,position=5)][switch]$SelectMediaTypes,
-        [Parameter(Mandatory=$false,position=6)][switch]$SelectUsrGrps
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][array]$filterUser,
+        [Parameter(Mandatory = $false, position = 4)][switch]$SelectMedias,
+        [Parameter(Mandatory = $false, position = 5)][switch]$SelectMediaTypes,
+        [Parameter(Mandatory = $false, position = 6)][switch]$SelectUsrGrps
     )
     $getUser = @{
-        "jsonrpc"="2.0";
-        "method"="user.get";
-        "params"=@{
-            "output"="extend"
+        "jsonrpc" = "2.0";
+        "method"  = "user.get";
+        "params"  = @{
+            "output" = "extend"
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
     #Filter
-    if($filterUser){
+    if ($filterUser) {
         $arrUS = @()
         foreach ( $oneUS in ($filterUser -split ",") ) {
-            $oneResUS = ('"'+ $oneUS +'"')
-            $arrUS  += $oneResUS
+            $oneResUS = ('"' + $oneUS + '"')
+            $arrUS += $oneResUS
         }
         $addUS = $arrUS -join ","
-        $filterName = @{"username"= @("[$addUS]")}
-        $getUser.params.Add("filter",$filterName)
+        $filterName = @{"username" = @("[$addUS]") }
+        $getUser.params.Add("filter", $filterName)
     }
     #Return user alerts that are used by the user.
-    If($SelectMedias){
-        $getUser.params.Add("selectMedias","extend")
+    If ($SelectMedias) {
+        $getUser.params.Add("selectMedias", "extend")
     }
     #Return the notification methods that the user is using.
-    If($SelectMediaTypes){
-        $getUser.params.Add("selectMediatypes","extend")
+    If ($SelectMediaTypes) {
+        $getUser.params.Add("selectMediatypes", "extend")
     }
     #Return user groups that users belong to.
-    If($SelectUsrGrps){
-        $getUser.params.Add("selectUsrgrps","extend")
+    If ($SelectUsrGrps) {
+        $getUser.params.Add("selectUsrgrps", "extend")
     }
-    $json = (ConvertTo-Json -InputObject $getUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $getUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
@@ -630,46 +666,46 @@ function New-UserZabbixAPI {
         New-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -NewUser TestPS -NewUserPass "Passw0rd" -UserGroupsId "13,15" -UserRolesId 1
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][string]$NewUser,
-        [Parameter(Mandatory=$true,position=4)][string]$NewUserPass,
-        [Parameter(Mandatory=$true,position=5)][array]$UserGroupsId,
-        [Parameter(Mandatory=$true,position=6)][int]$UserRolesId,
-        [Parameter(Mandatory=$false,position=7)][string]$NewUserName,
-        [Parameter(Mandatory=$false,position=8)][string]$NewUserSurname
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][string]$NewUser,
+        [Parameter(Mandatory = $true, position = 4)][string]$NewUserPass,
+        [Parameter(Mandatory = $true, position = 5)][array]$UserGroupsId,
+        [Parameter(Mandatory = $true, position = 6)][int]$UserRolesId,
+        [Parameter(Mandatory = $false, position = 7)][string]$NewUserName,
+        [Parameter(Mandatory = $false, position = 8)][string]$NewUserSurname
         #[Parameter(Mandatory=$false,position=6)][array]$UserMedia
     )
     $createUser = @{
-        "jsonrpc"="2.0";
-        "method"="user.create";
-        "params"=@{
-            "alias"=$NewUser;
-            "passwd"=$NewUserPass;
-            "roleid"=$UserRolesId;
+        "jsonrpc" = "2.0";
+        "method"  = "user.create";
+        "params"  = @{
+            "alias"  = $NewUser;
+            "passwd" = $NewUserPass;
+            "roleid" = $UserRolesId;
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
     #Add GroupsID to JSON.
-    if($UserGroupsId){
-        $arrUserGroups  = @()
+    if ($UserGroupsId) {
+        $arrUserGroups = @()
         foreach ( $oneUserGroups  in ($UserGroupsId -split ",") ) {
-            $resUserGroups  = ( '{"usrgrpid":"'+ $oneUserGroups  +'"}' )
-            $arrUserGroups  += $resUserGroups
+            $resUserGroups = ( '{"usrgrpid":"' + $oneUserGroups + '"}' )
+            $arrUserGroups += $resUserGroups
         }
-        $addUserGroups  = $arrUserGroups -join ","
-        $createUser.params.Add("usrgrps",@($addUserGroups))
+        $addUserGroups = $arrUserGroups -join ","
+        $createUser.params.Add("usrgrps", @($addUserGroups))
     }
-    if($NewUserName){
-        $createUser.params.Add("name",$NewUserName)
+    if ($NewUserName) {
+        $createUser.params.Add("name", $NewUserName)
     }
-    if($NewUserSurname){
-        $createUser.params.Add("surname",$NewUserSurname)
+    if ($NewUserSurname) {
+        $createUser.params.Add("surname", $NewUserSurname)
     }
 
-    $json = (ConvertTo-Json -InputObject $createUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"\{','{' -replace '\}"','}'
+    $json = (ConvertTo-Json -InputObject $createUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"\{', '{' -replace '\}"', '}'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res
 }
@@ -683,27 +719,27 @@ function Remove-UserZabbixAPI {
         Remove-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -RemoveUser "3,44"
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][array]$RemoveUser
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][array]$RemoveUser
     )
     $delUser = @{
-        "jsonrpc"="2.0";
-        "method"="user.delete";
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "jsonrpc" = "2.0";
+        "method"  = "user.delete";
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
-    If($RemoveUser){
+    If ($RemoveUser) {
         $arrR = @()
-        foreach ( $oneRemoveUser in ($RemoveUser -split ",") ){
-        $resRemoveUser = ('"'+ $oneRemoveUser +'"')
-        $arrR += $resRemoveUser
+        foreach ( $oneRemoveUser in ($RemoveUser -split ",") ) {
+            $resRemoveUser = ('"' + $oneRemoveUser + '"')
+            $arrR += $resRemoveUser
         }
         $addRemoveUser = $arrR -join ","
-        $delUser.Add("params","[$addRemoveUser]")
+        $delUser.Add("params", "[$addRemoveUser]")
     }
-    $json = (ConvertTo-Json -InputObject $delUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $delUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
@@ -729,63 +765,63 @@ function Set-UserZabbixAPI {
         Set-UserZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -UserId 47 -Username User1 -Usrgrps "13,14,15" -UserRoleId 2 
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][int]$UserId,
-        [Parameter(Mandatory=$false,position=4)][string]$Username,
-        [Parameter(Mandatory=$false,position=5)][string]$Name,
-        [Parameter(Mandatory=$false,position=6)][string]$Surname,
-        [Parameter(Mandatory=$false,position=7)][string]$UrlAfterLogin,
-        [Parameter(Mandatory=$false,position=8)][string]$Passwd,
-        [Parameter(Mandatory=$false,position=9)][int]$UserRoleId,
-        [Parameter(Mandatory=$false,position=10)][array]$Usrgrps
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][int]$UserId,
+        [Parameter(Mandatory = $false, position = 4)][string]$Username,
+        [Parameter(Mandatory = $false, position = 5)][string]$Name,
+        [Parameter(Mandatory = $false, position = 6)][string]$Surname,
+        [Parameter(Mandatory = $false, position = 7)][string]$UrlAfterLogin,
+        [Parameter(Mandatory = $false, position = 8)][string]$Passwd,
+        [Parameter(Mandatory = $false, position = 9)][int]$UserRoleId,
+        [Parameter(Mandatory = $false, position = 10)][array]$Usrgrps
     )
 
     $updateUser = @{
-        "jsonrpc"="2.0";
-        "method"="user.update";
-        "params"=@{
-            "userid"=$UserId;
+        "jsonrpc" = "2.0";
+        "method"  = "user.update";
+        "params"  = @{
+            "userid" = $UserId;
         }
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
     #Rename User Name.
-    If($Username){
-        $updateUser.params.Add("username",$Username)
+    If ($Username) {
+        $updateUser.params.Add("username", $Username)
     }
     #Rename Name.
-    If($Name){
-        $updateUser.params.Add("name",$Name)
+    If ($Name) {
+        $updateUser.params.Add("name", $Name)
     }
     #Rename Surname.
-    If($Surname){
-        $updateUser.params.Add("surname",$Surname)
+    If ($Surname) {
+        $updateUser.params.Add("surname", $Surname)
     }
     #Change Url After Login.
-    If($UrlAfterLogin){
-        $updateUser.params.Add("url",$UrlAfterLogin)
+    If ($UrlAfterLogin) {
+        $updateUser.params.Add("url", $UrlAfterLogin)
     }
     #Change User Password.
-    If($Passwd){
-        $updateUser.params.Add("passwd",$Passwd)
+    If ($Passwd) {
+        $updateUser.params.Add("passwd", $Passwd)
     }
     #Change User RoleID.
-    If($UserRoleId){
-        $updateUser.params.Add("roleid",$UserRoleId)
+    If ($UserRoleId) {
+        $updateUser.params.Add("roleid", $UserRoleId)
     }
     #Change\Add User Groups.
-    if($Usrgrps){
+    if ($Usrgrps) {
         $arrUGC = @()
         foreach ( $oneUGC in ($Usrgrps -split ",") ) {
-            $oneResUGC = ('{"usrgrpid":'+ $oneUGC +'}')
-            $arrUGC  += $oneResUGC
+            $oneResUGC = ('{"usrgrpid":' + $oneUGC + '}')
+            $arrUGC += $oneResUGC
         }
         $addUGC = $arrUGC -join ","
-        $updateUser.params.Add("usrgrps","[$addUGC]")
+        $updateUser.params.Add("usrgrps", "[$addUGC]")
     }
-    $json = (ConvertTo-Json -InputObject $updateUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']' -replace '"\{','{' -replace '\}"','}'
+    $json = (ConvertTo-Json -InputObject $updateUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"\{', '{' -replace '\}"', '}'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
@@ -806,35 +842,35 @@ function Get-UserRoleZabbixAPI {
         Get-UserRoleZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -SelectUsers -roleids "5,6"
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][switch]$SelectRules,
-        [Parameter(Mandatory=$false,position=4)][switch]$SelectUsers,
-        [Parameter(Mandatory=$false,position=5)][array]$Roleids
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][switch]$SelectRules,
+        [Parameter(Mandatory = $false, position = 4)][switch]$SelectUsers,
+        [Parameter(Mandatory = $false, position = 5)][array]$Roleids
     )
     $getRole = @{
-        "jsonrpc"="2.0";
-        "method"="role.get";
-        "params"=@{
-            "output"="extend";
+        "jsonrpc" = "2.0";
+        "method"  = "role.get";
+        "params"  = @{
+            "output" = "extend";
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
     #Return role rules in the rules property.
-    If($SelectRules){
-        $getRole.params.Add("selectRules","extend")
+    If ($SelectRules) {
+        $getRole.params.Add("selectRules", "extend")
     }
     #Select users this role is assigned to.
-    If($selectUsers){
-        $getRole.params.Add("selectUsers","extend")
+    If ($selectUsers) {
+        $getRole.params.Add("selectUsers", "extend")
     }
     #Return only roles with the given IDs.
-    If($Roleids){
-        $getRole.params.Add("roleids","[$Roleids]")
+    If ($Roleids) {
+        $getRole.params.Add("roleids", "[$Roleids]")
     }
-    $json = (ConvertTo-Json -InputObject $getRole) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $getRole) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
@@ -867,66 +903,66 @@ function Get-MaintenanceZabbixAPI {
         Get-MaintenanceZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -FilterMaintenance "maintenance1,maintenance2"
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$false,position=3)][switch]$SelectGroups,
-        [Parameter(Mandatory=$false,position=4)][switch]$SelectHosts,
-        [Parameter(Mandatory=$false,position=5)][switch]$SelectTimeperiods,
-        [Parameter(Mandatory=$false,position=6)][switch]$SelectTags,
-        [Parameter(Mandatory=$false,position=7)][array]$FilterMaintenance,
-        [Parameter(Mandatory=$false,position=8)][array]$FindHostIds,
-        [Parameter(Mandatory=$false,position=9)][array]$FindGroupIds,
-        [Parameter(Mandatory=$false,position=10)][array]$FindMaintenanceIds
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][switch]$SelectGroups,
+        [Parameter(Mandatory = $false, position = 4)][switch]$SelectHosts,
+        [Parameter(Mandatory = $false, position = 5)][switch]$SelectTimeperiods,
+        [Parameter(Mandatory = $false, position = 6)][switch]$SelectTags,
+        [Parameter(Mandatory = $false, position = 7)][array]$FilterMaintenance,
+        [Parameter(Mandatory = $false, position = 8)][array]$FindHostIds,
+        [Parameter(Mandatory = $false, position = 9)][array]$FindGroupIds,
+        [Parameter(Mandatory = $false, position = 10)][array]$FindMaintenanceIds
     )
     $getMaintenance = @{
-        "jsonrpc"="2.0";
-        "method"="maintenance.get";
-        "params"=@{
-            "output"="extend";
+        "jsonrpc" = "2.0";
+        "method"  = "maintenance.get";
+        "params"  = @{
+            "output" = "extend";
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
-    If($SelectGroups){
-        $getMaintenance.params.Add("selectGroups","extend")
+    If ($SelectGroups) {
+        $getMaintenance.params.Add("selectGroups", "extend")
     }
-    If($SelectHosts){
-        $getMaintenance.params.Add("selectHosts","extend")
+    If ($SelectHosts) {
+        $getMaintenance.params.Add("selectHosts", "extend")
     }
-    If($SelectTimeperiods){
-        $getMaintenance.params.Add("selectTimeperiods","extend")
+    If ($SelectTimeperiods) {
+        $getMaintenance.params.Add("selectTimeperiods", "extend")
     }
-    If($SelectTags){
-        $getMaintenance.params.Add("selectTags","extend")
+    If ($SelectTags) {
+        $getMaintenance.params.Add("selectTags", "extend")
     }
     #Filter
-    if($FilterMaintenance){
+    if ($FilterMaintenance) {
         $arrMT = @()
         foreach ( $oneMT in ($FilterMaintenance -split ",") ) {
-            $oneResMT = ('"'+ $oneMT +'"')
-            $arrMT  += $oneResMT
+            $oneResMT = ('"' + $oneMT + '"')
+            $arrMT += $oneResMT
         }
         $addMT = $arrMT -join ","
-        $filterName = @{"name"= @("[$addMT]")}
-        $getMaintenance.params.Add("filter",$filterName)
+        $filterName = @{"name" = @("[$addMT]") }
+        $getMaintenance.params.Add("filter", $filterName)
     }
     #Return only those services that are assigned to the specified network nodes.
-    if($FindHostIds){
+    if ($FindHostIds) {
         $addFindH = $FindHostIds -replace "\s"
-        $getMaintenance.params.Add("hostids","[$addFindH]")
+        $getMaintenance.params.Add("hostids", "[$addFindH]")
     }
     #Return only those services that are assigned to the specified groups of network nodes.
-    if($FindGroupIds){
+    if ($FindGroupIds) {
         $addFindG = $FindGroupIds -replace "\s"
-        $getMaintenance.params.Add("groupids","[$addFindG]")
+        $getMaintenance.params.Add("groupids", "[$addFindG]")
     }
     #Return of services with specified IDs only.
-    if($FindMaintenanceIds){
+    if ($FindMaintenanceIds) {
         $addFindM = $FindMaintenanceIds -replace "\s"
-        $getMaintenance.params.Add("maintenanceids","[$addFindM]")
+        $getMaintenance.params.Add("maintenanceids", "[$addFindM]")
     } 
-    $json = (ConvertTo-Json -InputObject $getMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $getMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
@@ -948,15 +984,15 @@ function New-MaintenanceZabbixAPI {
         Hosts that will undergo maintenance.The hosts must have the hostid property defined. At least one object of groups or hosts must be specified. Example: -HostIds "13123,4456" 
     #>
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][string]$NameMaintenance,
-        [Parameter(Mandatory=$true,position=4)][datetime]$ActiveSince,
-        [Parameter(Mandatory=$true,position=5)][datetime]$ActiveTill,
-        [Parameter(Mandatory=$false,position=6)][ValidateSet("WithData","NoData")]$MaintenanceType,
-        [Parameter(Mandatory=$false,position=7)][array]$GroupIds,
-        [Parameter(Mandatory=$false,position=8)][array]$HostIds
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][string]$NameMaintenance,
+        [Parameter(Mandatory = $true, position = 4)][datetime]$ActiveSince,
+        [Parameter(Mandatory = $true, position = 5)][datetime]$ActiveTill,
+        [Parameter(Mandatory = $false, position = 6)][ValidateSet("WithData", "NoData")]$MaintenanceType,
+        [Parameter(Mandatory = $false, position = 7)][array]$GroupIds,
+        [Parameter(Mandatory = $false, position = 8)][array]$HostIds
     )
 
     try {  
@@ -971,16 +1007,16 @@ function New-MaintenanceZabbixAPI {
         }
 
         $createMaintenance = @{
-            "jsonrpc"="2.0";
-            "method"="maintenance.create";
-            "params"=@{
-                "name"="$NameMaintenance";
-                "active_since"=$AS;
-                "active_till"=$AT;
-                "maintenance_type"=$mType
+            "jsonrpc" = "2.0";
+            "method"  = "maintenance.create";
+            "params"  = @{
+                "name"             = "$NameMaintenance";
+                "active_since"     = $AS;
+                "active_till"      = $AT;
+                "maintenance_type" = $mType
             };
-            "auth" = $TokenApi;
-            "id" = $TokenId
+            "auth"    = $TokenApi;
+            "id"      = $TokenId
         }
 
         #Add periods
@@ -993,34 +1029,35 @@ function New-MaintenanceZabbixAPI {
         $Period = 31536000
         $periodStartDate = $AS
         $periods = @{
-            "timeperiod_type"=$periodTimeType
-            "every"=$periodEvery
-            "month"=$periodMonth
-            "dayofweek"=$periodDayofweek
-            "day"=$periodDay
-            "start_time"=$periodStartTime
-            "period"=$Period
-            "start_date"=$periodStartDate
+            "timeperiod_type" = $periodTimeType
+            "every"           = $periodEvery
+            "month"           = $periodMonth
+            "dayofweek"       = $periodDayofweek
+            "day"             = $periodDay
+            "start_time"      = $periodStartTime
+            "period"          = $Period
+            "start_date"      = $periodStartDate
         }
-        $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
-        $createMaintenance.params.Add("timeperiods",@($jsonPeriods))
+        $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
+        $createMaintenance.params.Add("timeperiods", @($jsonPeriods))
 
         #Add groupids or hostids
         $findVar = ($GroupIds + $HostIds)      
-        if ( -Not $findVar ){
+        if ( -Not $findVar ) {
             Write-Error -Message "Please make sure to set one of the groupids or hostids parameters" -ErrorAction Stop
-        }else{
-            if($GroupIds){
+        }
+        else {
+            if ($GroupIds) {
                 $cGroupids = $GroupIds -replace "\s"
-                $createMaintenance.params.Add("groupids",@($cGroupids))
+                $createMaintenance.params.Add("groupids", @($cGroupids))
             }
-            if($HostIds){
+            if ($HostIds) {
                 $cHostids = $HostIds -replace "\s"
-                $createMaintenance.params.Add("hostids",@($cHostids))
+                $createMaintenance.params.Add("hostids", @($cHostids))
             }
         }
 
-        $json = (ConvertTo-Json -InputObject $createMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+        $json = (ConvertTo-Json -InputObject $createMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
         $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
         return $res.result
     }
@@ -1031,60 +1068,60 @@ function New-MaintenanceZabbixAPI {
 }
 function Update-MaintenanceZabbixAPI {
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][int]$MaintenanceId,
-        [Parameter(Mandatory=$false,position=4)][string]$NameMaintenance,
-        [Parameter(Mandatory=$false,position=5)][datetime]$ActiveSince,
-        [Parameter(Mandatory=$false,position=6)][datetime]$ActiveTill,
-        [Parameter(Mandatory=$false,position=7)][ValidateSet("WithData","NoData")]$MaintenanceType,
-        [Parameter(Mandatory=$false,position=8)][array]$groupids,
-        [Parameter(Mandatory=$false,position=9)][array]$hostids
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][int]$MaintenanceId,
+        [Parameter(Mandatory = $false, position = 4)][string]$NameMaintenance,
+        [Parameter(Mandatory = $false, position = 5)][datetime]$ActiveSince,
+        [Parameter(Mandatory = $false, position = 6)][datetime]$ActiveTill,
+        [Parameter(Mandatory = $false, position = 7)][ValidateSet("WithData", "NoData")]$MaintenanceType,
+        [Parameter(Mandatory = $false, position = 8)][array]$groupids,
+        [Parameter(Mandatory = $false, position = 9)][array]$hostids
     )
     $updateMaintenance = @{
-        "jsonrpc"="2.0";
-        "method"="maintenance.update";
-        "params"=@{
-            "maintenanceid"=$MaintenanceId
+        "jsonrpc" = "2.0";
+        "method"  = "maintenance.update";
+        "params"  = @{
+            "maintenanceid" = $MaintenanceId
         };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
     #name
-    if($NameMaintenance){
-        $updateMaintenance.params.add("name",$NameMaintenance)
+    if ($NameMaintenance) {
+        $updateMaintenance.params.add("name", $NameMaintenance)
     }
     #active_since
-    if($ActiveSince){
+    if ($ActiveSince) {
         $AS = Get-Date $ActiveSince -UFormat %s
-        $updateMaintenance.params.add("active_since",$AS)
+        $updateMaintenance.params.add("active_since", $AS)
     }
     #active_till
-    if($ActiveTill){
+    if ($ActiveTill) {
         $AT = Get-Date $ActiveTill -UFormat %s
-        $updateMaintenance.params.add("active_till",$AT)
+        $updateMaintenance.params.add("active_till", $AT)
     }
     #maintenance_type
-    if($MaintenanceType){
+    if ($MaintenanceType) {
         switch ($MaintenanceType) {
             "NoData" { $mType = 1 }
             "WithData" { $mType = 0 }
-             Default { $mType = 0 }
+            Default { $mType = 0 }
         }
-        $updateMaintenance.params.add("maintenance_type",$mType)
+        $updateMaintenance.params.add("maintenance_type", $mType)
     }
     #Add groupids or hostids
-    if($groupids){
+    if ($groupids) {
         $cGroupids = $groupids -replace "\s"
-        $updateMaintenance.params.Add("groupids",@($cGroupids))
+        $updateMaintenance.params.Add("groupids", @($cGroupids))
     }
-    if($hostids){
+    if ($hostids) {
         $cHostids = $hostids -replace "\s"
-        $updateMaintenance.params.Add("hostids",@($cHostids))
+        $updateMaintenance.params.Add("hostids", @($cHostids))
     }
 
-        <#
+    <#
         #Add periods
         $periodTimeType = 0
         $periodEvery = 1
@@ -1107,30 +1144,301 @@ function Update-MaintenanceZabbixAPI {
         $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
         $updateMaintenance.params.Add("timeperiods",@($jsonPeriods))
         #>
-    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
 function Remove-MaintenanceZabbixAPI {
     param (
-        [Parameter(Mandatory=$true,position=0)][string]$UrlApi,
-        [Parameter(Mandatory=$true,position=1)][string]$TokenApi,
-        [Parameter(Mandatory=$true,position=2)][int]$TokenId,
-        [Parameter(Mandatory=$true,position=3)][array]$MaintenanceId
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][array]$MaintenanceId
     )
 
     $deleteMaintenance = @{
-        "jsonrpc"="2.0";
-        "method"="maintenance.delete";
-        "auth" = $TokenApi;
-        "id" = $TokenId
+        "jsonrpc" = "2.0";
+        "method"  = "maintenance.delete";
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
     }
 
-    $deleteMaintenance.Add("params",@($MaintenanceId -split ","))
+    $deleteMaintenance.Add("params", @($MaintenanceId -split ","))
 
-    $json = (ConvertTo-Json -InputObject $deleteMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[','[' -replace '\]"',']'
+    $json = (ConvertTo-Json -InputObject $deleteMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
 
-Export-ModuleMember -Function Connect-ZabbixAPI, Get-HostGroupsZabbixAPI, Get-HostsZabbixAPI, New-HostZabbixAPI, Get-TemplateZabbixAPI, Get-UserGroupZabbixAPI, New-UserGroupZabbixAPI, Get-UserZabbixAPI, New-UserZabbixAPI, Remove-UserZabbixAPI, Set-UserZabbixAPI, Get-UserRoleZabbixAPI, Get-MaintenanceZabbixAPI, Get-MaintenanceZabbixAPI, New-MaintenanceZabbixAPI, Update-MaintenanceZabbixAPI, Remove-MaintenanceZabbixAPI
+#########################################
+#Working with Item Zabbix API.
+function New-ItemZabbixAPI {
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][string]$itemName,
+        [Parameter(Mandatory = $true, position = 4)][string]$itemKey,
+        [Parameter(Mandatory = $true, position = 5)][int]$hostIDorTemplateID,
+        <#Type: Possible values:
+        0 - Zabbix agent;
+        2 - Zabbix trapper;
+        3 - Simple check;
+        5 - Zabbix internal;
+        7 - Zabbix agent (active);
+        9 - Web item;
+        10 - External check;
+        11 - Database monitor;
+        12 - IPMI agent;
+        13 - SSH agent;
+        14 - Telnet agent;
+        15 - Calculated;
+        16 - JMX agent;
+        17 - SNMP trap;
+        18 - Dependent item;
+        19 - HTTP agent;
+        20 - SNMP agent;
+        21 - Script
+        #>
+        [Parameter(Mandatory = $true, position = 6)][int]$itemType = 7
+
+        <#Value Type Possible values:
+        0 - numeric float;
+        1 - character;
+        2 - log;
+        3 - numeric unsigned;
+        4 - text.
+        #>
+    )  
+    $createItem = @{
+        "jsonrpc" = "2.0";
+        "method"  = "item.create";
+        "params"  = @{
+            "name"        = "$itemName";
+            "key_"        = "$itemKey";
+            "hostid"      = $hostIDorTemplateID ;
+            "type"        = $itemType;
+            "value_type"  = 2;
+            "delay"       = "2m";
+            "description" = ""
+        };
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
+    }   
+    $json = (ConvertTo-Json -InputObject $createItem) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+
+function Get-ItemZabbixAPI {
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)]$Hosts
+        
+    )
+    $itemGet = @{
+        "jsonrpc" = "2.0";
+        "method" = "item.get";
+        "params" = @{
+            "output" = "extend";         
+            "sortfield" = "name"
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+    
+    if ( $Hosts.GetType().Name -eq "String" ) {
+        $itemGet.params.Add("host",$Hosts)
+    }
+    if ( $Hosts.GetType().Name -eq "Int32" ) {
+        $itemGet.params.Add("hostids",$Hosts)
+    }
+     
+    $json = (ConvertTo-Json -InputObject $itemGet) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+
+#########################################
+#Working with Trigger Zabbix API.
+function New-TriggerZabbixAPI {
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][string]$triggerName,
+        #Trigger key example: "logeventid(/Name_Tamplate_Or_Host/eventlog[,,,,5555,,skip],#1)=1"
+        [Parameter(Mandatory = $true, position = 4)][string]$triggerKey,
+        [Parameter(Mandatory = $true, position = 5)][string]$triggerDescription
+    )
+    $createTrigger = @{
+        "jsonrpc" = "2.0";
+        "method"  = "trigger.create";
+        "params"  = @(@{
+                "description"  = "$triggerName";
+                "expression"   = "$triggerKey";
+                "hostid"       = $hostIDorTemplateID ;
+                "comments"     = $triggerDescription;
+                "priority"     = 3;
+                "type"         = 0;
+                "manual_close" = 1
+            });
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
+    } 
+    $json = (ConvertTo-Json -InputObject $createTrigger) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+
+#########################################
+#Work with Graph Zabbix API.
+function Get-GraphZabbixAPI {
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][int]$hostids
+    )
+    $getGraph = @{
+        "jsonrpc" = "2.0";
+        "method"  = "graph.get";
+        "params"  = @{
+            "output"    = "extend";
+            "hostids"   = $hostids;
+            "sortfield" = "name"
+        };
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
+    } 
+    $json = (ConvertTo-Json -InputObject $getGraph) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    return $res.result
+}
+
+#Connect and Autorization to Zabbix WEB.
+function Connect-ZabbixWEB {
+    <#
+    .SYNOPSIS
+        Authorization and receipt of cookie on the Zabbix website (Example: http://IP_or_FQDN/zabbix/index.php?login=1). Cookie is necessary for further access to the web without the need to enter a login and password.
+        Add the command as a variable to save and use the web session in other commands, based on cookies.
+    .PARAMETER UrlWeb
+        Specify the URL to connect to the Zabbix Web. Example -UrlWeb 'http://IP_or_FQDN/zabbix'
+    .PARAMETER User
+        A Zabbix user who has rights to connect to the Zabbix Web. Example: -User UserAdmin
+    .PARAMETER inPasswd
+        Enter the password. If you do not specify a password, the system will ask you to enter it.
+    .EXAMPLE
+        Connect-ZabbixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -User UserAdmin
+        Connect-ZabbixAPI -UrlWeb 'http://IP_or_FQDN/zabbix' -User UserAdmin -inPasswd "Passw0rd"
+    #>
+    param(
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlWeb,
+        [Parameter(Mandatory = $true, position = 1)][string]$User,
+        [Parameter(Mandatory = $false, position = 2, ParameterSetName = "Passwd")]$inPasswd
+    )
+    if ( $inPasswd ) {
+        $str = $inPasswd
+    }
+    else {
+        $passwdAdmin = Read-Host "Enter password" -AsSecureString
+        $Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($passwdAdmin)
+        $str = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($Ptr)
+    } 
+
+    $loginPostData = @{
+        name     = $User;
+        password = $str;
+        enter    = "Enter"
+    }
+    $invokeWebReq =  Invoke-WebRequest -Method Post -Uri ($UrlWeb + "/index.php?login=1") -Body $loginPostData -SessionVariable zabbixSession -UserAgent Chrome
+    return $zabbixSession
+}
+
+#Save the graph as a PNG file.
+function Save-GraphZabixWEB {
+    <#
+    .SYNOPSIS
+        Original url with PNG Graph Host "http://IP_or_FQDN/zabbix/chart2.php?graphid=2292&from=now-60m&to=now&height=201&width=1436&profileIdx=web.charts.filter"
+        Original url with PNG Graph Item  "http://IP_or_FQDN/zabbix/chart.php?from=now-1h&to=now&itemids%5B0%5D=42714&type=0&profileIdx=web.item.graph.filter&profileIdx2=46112&width=1530&height=200&_=vuvt401w"
+        ####
+        If we use the host graph. Example:
+        #1.
+        Use commandlet Connect-ZabbixWEB then Get-graphZabbixAPI.
+        #2.
+        Save-GraphZabixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -graphId 33065 -timeFrom "now-24h" -timeTo "now" -imgHeight "200" -imgWidth "1530" -imgSave "C:\img\graphHost.png" -WebSession $sessionCookie 
+        ####
+        If we use the item graph. Example:
+        #1.
+        Use commandle Connect-ZabbixWEB then Get-ItemZabbixAPI.
+        #2.
+        Save-GraphZabixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -graphId_Item 44658 -timeFrom "now-24h" -timeTo "now" -imgHeight "200" -imgWidth "1530" -imgSave "C:\img\graphItem.png" -WebSession $sessionCookie
+    .PARAMETER UrlWeb
+        Specify the URL to connect to the Zabbix Web. Example -UrlWeb 'http://IP_or_FQDN/zabbix'
+    .PARAMETER graphId
+        The ID of the graph, we will find out through Get-graphZabbixAPI. Example: -graphId 22013
+    .PARAMETER graphId_Item
+        The ID of the item, we will find out through Get-ItemZabbixAPI. Example: -graphId_Item 36276
+    .PARAMETER timeFrom
+        m - minutes; h - hour; d - day; M - months; y - year. Example: -timeFrom "now-15m"
+    .PARAMETER timeTo
+        Example: -timeTo "now"
+    .PARAMETER imgHeight
+        Image height. Example -imgHeight 201
+    .PARAMETER imgWidth
+        Imagw width. Example -imgWidth 1436
+    .PARAMETER imgSave
+        Where do we save the downloaded files. Example: -$imgSave "C:\img\imgFile.png"
+    .PARAMETER WebSession
+        Send cookie to a web session, execute Connect-ZabbixWEB. Example: -WebSession $sessionCookie
+    .EXAMPLE
+        Save-GraphZabixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -graphId 22013 -timeFrom "now-2d" -imgHeight "201" -imgWidth "1436" -imgSave "C:\img\imgFile.png" -WebSession $sessionCookie
+    .EXAMPLE
+        Save-GraphZabixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -graphId_Item $itemId -timeFrom "now-24h" -timeTo "now" -imgHeight "200" -imgWidth "1530" -imgSave "C:\img\graphItem.png" -WebSession $sessionCookie
+        #>
+    param(
+        [Parameter(Mandatory = $true,  position = 0)][string]$UrlWeb,
+        [Parameter(Mandatory = $false, position = 1)][int]$graphId,
+        [Parameter(Mandatory = $false, position = 2)][int]$graphId_Item,
+        [Parameter(Mandatory = $true,  position = 3)][string]$timeFrom,
+        [Parameter(Mandatory = $true,  position = 4)][string]$timeTo,
+        [Parameter(Mandatory = $false, position = 5)][int]$imgHeight = 201,
+        [Parameter(Mandatory = $false, position = 6)][int]$imgWidth = 1436,
+        [Parameter(Mandatory = $true,  position = 7)][string]$imgSave,
+        [Parameter(Mandatory = $true,  position = 8)]$WebSession
+    )
+    if ( $graphId ) {
+        $imgUrlJoin = ($UrlWeb +"/chart2.php?graphid="+ $graphId +"&from="+ $timeFrom +"&to="+ $timeTo +"&height="+ $imgHeight +"&width="+ $imgWidth +"&profileIdx=web.charts.filter")
+    }
+    if ( $graphId_Item ){
+        $imgUrlJoin = ($UrlWeb +"/chart.php?from="+ $timeFrom +"&to="+ $timeTo +"&itemids%5B0%5D="+ $graphId_Item +"&type=0&profileIdx=web.item.graph.filter&profileIdx2=46112&width="+ $imgWidth +"&height="+ $imgHeight +"&_=vuvt401w")
+    }
+    Invoke-WebRequest -Method Post -Uri $imgUrlJoin -WebSession $WebSession -UserAgent Chrome -OutFile $imgSave
+}
+
+
+Export-ModuleMember -Function Connect-ZabbixAPI, `
+Get-HostGroupsZabbixAPI, `
+Get-HostsZabbixAPI, `
+New-HostZabbixAPI, `
+Remove-HostsZabbixAPI, `
+Get-TemplateZabbixAPI, `
+Get-UserGroupZabbixAPI, `
+New-UserGroupZabbixAPI, `
+Get-UserZabbixAPI, `
+New-UserZabbixAPI, `
+Remove-UserZabbixAPI, `
+Set-UserZabbixAPI, `
+Get-UserRoleZabbixAPI, `
+Get-MaintenanceZabbixAPI, `
+New-MaintenanceZabbixAPI, `
+Update-MaintenanceZabbixAPI, `
+Remove-MaintenanceZabbixAPI, `
+#New-ItemZabbixAPI, `
+Get-ItemZabbixAPI, `
+#New-triggerZabbixAPI, `
+Get-graphZabbixAPI, `
+Connect-ZabbixWEB, `
+Save-GraphZabixWEB
