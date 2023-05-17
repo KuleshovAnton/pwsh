@@ -188,7 +188,7 @@ function New-HostZabbixAPI {
     .PARAMETER Inventory_Mode
         Enable Inventory data. Select Manual or automatic filling of inventory data. Example: -Inventory_Mode (switch select: Manual,Auto)
     .PARAMETER Macros
-        Add custom MACROS in Host. Example: -Macros '{$USERID}:123423:User ID,{$HOSTID}:00001:Host ID}'
+        Add custom MACROS in Host. Example: -Macros '{$USERID};123423;User ID,{$HOSTID};00001;Host ID}'
     .EXAMPLE
         #Use Agent interface.
         New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "Host" -IP "192.168.1.2" -DNS "Host.domain.info" -Group_HostId 2 -Proxy_HostId 10518 -Use_Agent -TemplateId 1001 -Tags "srv:SERVER,subsys:LINUX"
@@ -426,11 +426,11 @@ function New-HostZabbixAPI {
     if ($Macros) {
         $arrMacros = @()
         foreach ( $oneMacros in ($Macros -split ",") ) {
-            $oMacros = $oneMacros -split ":"
+            $oMacros = $oneMacros -split ";"
             if($oMacros[2]){
                 $oDescription = $oMacros[2]
             }else { $oDescription = ''}
-            $resMacros = ( '{"macro":"' + $oMacros[0] + '","value":"' + $oMacros[1] + '","description":"' + $oDescription + '"}' )
+            $resMacros = ( '{"macro":""' + $oMacros[0] + '"","value":"' + $oMacros[1] + '","description":"' + $oDescription + '"}' )
             $arrMacros += $resMacros
         }
         $addMacros = $arrMacros -join ","
