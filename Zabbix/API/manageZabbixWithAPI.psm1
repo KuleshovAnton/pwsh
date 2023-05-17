@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.7
+#Version 1.0.0.8
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -182,11 +182,13 @@ function New-HostZabbixAPI {
     .PARAMETER Use_IP_Agent
         If the option is selected, the connection be made via an IP address. Example: -Use_IP_Agent
     .PARAMETER Tags
-        Set a tags for the host "tagName:valueParam,tagName:valueParam". Example -Tags "srv:SERVER,subsys:LINUX"
+        Set a tags for the host. Example -Tags 'srv:SERVER,subsys:LINUX'
     .PARAMETER TemplateId
         Template Host ID. Which template are we adding the host to. Example: -TemplateId "77,3,9"
     .PARAMETER Inventory_Mode
         Enable Inventory data. Select Manual or automatic filling of inventory data. Example: -Inventory_Mode (switch select: Manual,Auto)
+    .PARAMETER Macros
+        Add custom MACROS in Host. Example: -Macros '{$USERID}:123423:User ID,{$HOSTID}:00001:Host ID}'
     .EXAMPLE
         #Use Agent interface.
         New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "Host" -IP "192.168.1.2" -DNS "Host.domain.info" -Group_HostId 2 -Proxy_HostId 10518 -Use_Agent -TemplateId 1001 -Tags "srv:SERVER,subsys:LINUX"
@@ -231,7 +233,8 @@ function New-HostZabbixAPI {
         [Parameter(Mandatory = $false, position = 21)][switch]$Use_IP_IPMI,
         [Parameter(Mandatory = $false, position = 22)][string]$Tags, #Tags Host.
         [Parameter(Mandatory = $false, position = 23)][array]$TemplateId, #Template.
-        [Parameter(Mandatory = $false, position = 24)][ValidateSet("Manual", "Auto")]$Inventory_Mode                  #Enable Inventory data.
+        [Parameter(Mandatory = $false, position = 24)][ValidateSet("Manual", "Auto")]$Inventory_Mode,                  #Enable Inventory data.
+        [Parameter(Mandatory = $false, position = 25)][array]$Macros #Users Custom Macros.
     )
     ###Interface #######################################
     ##Agent Interfaces##
@@ -418,7 +421,21 @@ function New-HostZabbixAPI {
             "Auto" { [int]$InvMode = 1 }
         }
         $createHost.params.Add("inventory_mode", $InvMode)
-    } 
+    }    
+    #Add Macros Host to JSON.
+    if ($Macros) {
+        $arrMacros = @()
+        foreach ( $oneMacros in ($Macros -split ",") ) {
+            $oMacros = $oneMacros -split ":"
+            if($oMacros[2]){
+                $oDescription = $oMacros[2]
+            }else { $oDescription = ''}
+            $resMacros = ( '{"macro":"' + $oMacros[0] + '","value":"' + $oMacros[1] + '","description":"' + $oDescription + '"}' )
+            $arrMacros += $resMacros
+        }
+        $addMacros = $arrMacros -join ","
+        $createHost.params.Add("macros", @($addMacros))
+    }
     $jsonCreate = $createHost
     $json = (ConvertTo-Json -InputObject $jsonCreate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '\["{', '[{' -replace '}"\]', '}]' -replace '"{', '{' -replace '}"', '}'
     ###Create Host JSON END###############################
@@ -1394,7 +1411,7 @@ function Save-GraphZabixWEB {
     .PARAMETER WebSession
         Send cookie to a web session, execute Connect-ZabbixWEB. Example: -WebSession $sessionCookie
     .EXAMPLE
-        Save-GraphZabixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -graphId 22013 -timeFrom "now-2d" -imgHeight "201" -imgWidth "1436" -imgSave "C:\img\imgFile.png" -WebSession $sessionCookie
+        Save-GraphZabixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -graphId 22013 -timeFrom "now-2d" -timeTo "now" -imgHeight "201" -imgWidth "1436" -imgSave "C:\img\imgFile.png" -WebSession $sessionCookie
     .EXAMPLE
         Save-GraphZabixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -graphId_Item $itemId -timeFrom "now-24h" -timeTo "now" -imgHeight "200" -imgWidth "1530" -imgSave "C:\img\graphItem.png" -WebSession $sessionCookie
         #>
