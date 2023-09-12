@@ -58,7 +58,6 @@ function Get-HostGroupsZabbixAPI {
         Get-HostGroupsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterGroupName "Linux servers,Admin Windows Server" | Format-Table
         #Output all groups.
         Get-HostGroupsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 | Format-Table
-
     #>
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
@@ -1434,7 +1433,6 @@ function Save-GraphZabixWEB {
     }
     Invoke-WebRequest -Method Post -Uri $imgUrlJoin -WebSession $WebSession -UserAgent Chrome -OutFile $imgSave
 }
-
 
 Export-ModuleMember -Function Connect-ZabbixAPI, `
 Get-HostGroupsZabbixAPI, `
