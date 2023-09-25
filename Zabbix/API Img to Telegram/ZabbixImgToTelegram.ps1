@@ -63,6 +63,8 @@ function Invoke-ZabbixGraphToTelegram {
         Write-Host '3'
         #Write-Host "False" -ForegroundColor Red
         $err = $error[0] | format-list -Force
+        $errDate = ("###"+ $(Get-date) +";id_item;"+ $ZbxGraphId )
+        $errDate | Out-File /tmp/ZabbixImgToTelegram_Error.log -Append -Encoding utf8
         $err | Out-File /tmp/ZabbixImgToTelegram_Error.log -Append -Encoding utf8
     }
 }
