@@ -1,11 +1,13 @@
 #!/bin/pwsh
 
-#Version 1.0.5.5
+#Version 1.0.5.6
 #Synchronization of Zabbix groups and composition of groups with LDAP groups and users
 function manageZabbixSyncLDAPgroups {
     <#
     .SYNOPSIS
-        Synchronization of users groups Zabbix with LDAP groups. The list of LDAP groups comes in the form of JSON '[{"name":"group_LDAP_1"},{"name":"group_LDAP_2"}]'. The log is written in, by errors "/tmp/manageZabbixSyncLDAPgroups_Linux_Error.log". If parameter logsOn activate , the progress of the module stages is written in "/tmp/manageZabbixSyncLDAPgroups_Linux_Module.log".
+        Synchronization of users groups Zabbix with LDAP groups. The list of LDAP groups comes in the form of JSON '[{"name":"group_LDAP_1"},{"name":"group_LDAP_2"}]'. 
+        The log is written in, by errors "/tmp/manageZabbixSyncLDAPgroups_Linux_Error.log". If parameter logsOn activate , the progress of the module stages is written in 
+        "/tmp/manageZabbixSyncLDAPgroups_Linux_Module.log".
     .PARAMETER apiUser
         The user to connect to the Zabbix API. Example: -apiUser userZabbixAPI
     .PARAMETER apiUserPass
@@ -95,32 +97,45 @@ function manageZabbixSyncLDAPgroups {
             $buildQueryLdapGpCN = ("(cn="+ $buildFindGpLdapCN +")")
             $arrFindGpLdapCN += $buildQueryLdapGpCN
         }
-        $buildFindLdapGpCN = ( $arrFindGpLdapCN -join "" ) -replace "\s"
-        $queryFindLdapGpCN = (ldapsearch -x -D $ldapsearchUser -w $ldapsearchPass -H $ldapsearchServer -b "$ldapsearchBase" "(&(objectCategory=group)(|$buildFindLdapGpCN))" dn -o ldif-wrap=no -LLL 2>$errLdap.FullName)
+
+        $queryFindLdapGpCN = @()
+        #We determine how many elements we select at a time $BatchBy.
+        $BatchBy = 100
+        #Element selection cycle.
+        for ($i=0; $i -lt $arrFindGpLdapCN.Count; $1 += $BatchBy) {
+            $buildFindLdapGpCN = ( $arrFindGpLdapCN[$i..($i+$BatchBy-1)] -join "" ) -replace "\s"
+            #Request to LDAP to get group DN.
+            $queryCmdFindLdapGpCN = (ldapsearch -x -D $ldapsearchUser -w $ldapsearchPass -H $ldapsearchServer -b "$ldapsearchBase" "(&(objectCategory=group)(|$buildFindLdapGpCN))" dn -o ldif-wrap=no -LLL 2>$errLdap.FullName)
+            $queryFindLdapGpCN += $queryCmdFindLdapGpCN
+            sleep 1
+        }
 
         ###LDAP groups and users ( $arrFindGpLdapMemOf ). Search for users belonging to LDAP groups.
         $arrFindGpLdapMemOf = @()
-        foreach ( $buildFindGpLdapMemOf in ($queryFindLdapGpCN -match "(^dn.*)(CN=.*)" -replace "dn: ","") )  {
-            $buildQueryLdapGpMemOf = ("(memberOf="+ $buildFindGpLdapMemOf +")")
-            #$queryFindLdapGpMemOf = (ldapsearch -x -D $ldapsearchUser -w $ldapsearchPass -H $ldapsearchServer -b "$ldapsearchBase" "(&(objectCategory=person)(objectClass=user)$buildQueryLdapGpMemOf(userAccountControl=66048))" sAMAccountName -o ldif-wrap=no -LLL 2>$errLdap.FullName)
-            $queryFindLdapGpMemOf = (ldapsearch -x -D $ldapsearchUser -w $ldapsearchPass -H $ldapsearchServer -b "$ldapsearchBase" "(&(objectCategory=person)(objectClass=user)$buildQueryLdapGpMemOf)" sAMAccountName -o ldif-wrap=no -LLL 2>$errLdap.FullName)
+        for ($b=0; $b -lt $queryFindLdapGpCN.Count; $b += $BatchBy){
 
-            $objLdapGroup = $buildFindGpLdapMemOf -replace "CN=","" -replace ",.*",""
-            $findsAMAccountNameAll = ($queryFindLdapGpMemOf -match "^sAMAccountName") -replace "sAMAccountName:" -replace "\s"
-            if ( -Not $findsAMAccountNameAll ){
-                $findsAMAccountName = ''
-            }else {
-                $findsAMAccountName = $findsAMAccountNameAll
+            foreach ( $buildFindGpLdapMemOf in ($queryFindLdapGpCN[$b..($b+$BatchBy-1)] -match "(^dn.*)(CN=.*)" -replace "dn: ","") )  {
+                $buildQueryLdapGpMemOf = ("(memberOf="+ $buildFindGpLdapMemOf +")")
+                $queryFindLdapGpMemOf = (ldapsearch -x -D $ldapsearchUser -w $ldapsearchPass -H $ldapsearchServer -b "$ldapsearchBase" "(&(objectCategory=person)(objectClass=user)$buildQueryLdapGpMemOf)" sAMAccountName -o ldif-wrap=no -LLL 2>$errLdap.FullName)
+
+                $objLdapGroup = $buildFindGpLdapMemOf -replace "CN=","" -replace ",.*",""
+                $findsAMAccountNameAll = ($queryFindLdapGpMemOf -match "^sAMAccountName") -replace "sAMAccountName:" -replace "\s"
+                if ( -Not $findsAMAccountNameAll ){
+                    $findsAMAccountName = ''
+                }else {
+                    $findsAMAccountName = $findsAMAccountNameAll
+                }
+                
+                $arrObjMemOf = @()
+                foreach ( $onefindsAMAccountName in $findsAMAccountName ){
+                $objMemOf = New-Object System.Object
+                $objMemOf | Add-Member -Type NoteProperty -Name ldapGroup -Value $objLdapGroup
+                $objMemOf | Add-Member -Type NoteProperty -Name ldapUser -Value $onefindsAMAccountName
+                $arrObjMemOf += $objMemOf
+                }
+                $arrFindGpLdapMemOf += $arrObjMemOf
             }
-            
-            $arrObjMemOf = @()
-            foreach ( $onefindsAMAccountName in $findsAMAccountName ){
-            $objMemOf = New-Object System.Object
-            $objMemOf | Add-Member -Type NoteProperty -Name ldapGroup -Value $objLdapGroup
-            $objMemOf | Add-Member -Type NoteProperty -Name ldapUser -Value $onefindsAMAccountName
-            $arrObjMemOf += $objMemOf
-            }
-            $arrFindGpLdapMemOf += $arrObjMemOf
+            sleep 1
         }
 
         #Errors working with LDAP
