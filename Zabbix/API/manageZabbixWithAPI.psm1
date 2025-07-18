@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.8
+#Version 1.0.0.17
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -47,12 +47,25 @@ function Connect-ZabbixAPI {
     $token = (Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body ($data | ConvertTo-Json) -ContentType "application/json;charset=UTF-8")
     return $token
 }
-
 #########################################
 #Working with hosts and groups Zabbix API.
 #Host Groups Zabbix API.
 function Get-HostGroupsZabbixAPI {
     <#
+    .SYNOPSIS
+        ...
+    .PARAMETER filterGroupName
+        Return only those results that exactly match the given filter. Example: -filterGroupName "Group_Host_1,Group_Host_2"
+    .PARAMETER searchGroupName
+        Return result that match the given pattern (case-insensitive). if no additional options are given, this will perform a LIKE "%...%" search. Example: -searchGroupName "Group_Host_1"
+    .PARAMETER searchWildcardsEnabled
+        If set to True, enables the use of "*" as a wildcard character in the search parameter. Example: -searchGroupName "Group_Host*" -searchWildcardsEnabled $True
+    .PARAMETER searchStart
+        The search parameter will compare the beginning of fields, that is, perform a LIKE "...%" search instead. Ignored if searchWildcardsEnabled is set to True. Example: -searchGroupName "Group_Host" -searchStart $True
+    .PARAMETER searchByAny
+        If set to true, return results that match any of the criteria given in the filter or search parameter instead of all of them. Example: -searchByAny $True
+    .PARAMETER $groupids
+        ...
     .Example
         #Output only the groups you are looking for.
         Get-HostGroupsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterGroupName "Linux servers,Admin Windows Server" | Format-Table
@@ -63,7 +76,12 @@ function Get-HostGroupsZabbixAPI {
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
         [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
         [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
-        [Parameter(Mandatory = $false, position = 3)][array]$filterGroupName
+        [Parameter(Mandatory = $false, position = 3)][array]$filterGroupName,
+        [Parameter(Mandatory = $false, position = 4)][string]$searchGroupName,
+        [Parameter(Mandatory = $false, position = 5)][ValidateSet("True", "False")]$searchWildcardsEnabled,
+        [Parameter(Mandatory = $false, position = 6)][ValidateSet("True", "False")]$searchStart,
+        [Parameter(Mandatory = $false, position = 7)][ValidateSet("True", "False")]$searchByAny,
+        [Parameter(Mandatory = $false, position = 8)][string]$groupids
     )
     $getGroup = @{
         "jsonrpc" = "2.0";
@@ -82,52 +100,233 @@ function Get-HostGroupsZabbixAPI {
             $arrGp += $oneResGP
         }
         $addGp = $arrGp -join ","
-        $filterName = @{"name" = @("[$addGp]") }
+        $filterName = @{"name" = @("$addGp") }
         $getGroup.params.Add("filter", $filterName)
-    }  
-    $json = (ConvertTo-Json -InputObject $getGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    }
+    #Search
+    if ($searchGroupName) {
+        $searchName = @{"name" = "$searchGroupName"}
+        $getGroup.params.Add("search", $searchName)
+    }
+    #searchWildcardsEnabled
+    if($searchWildcardsEnabled){
+        $getGroup.params.Add("searchWildcardsEnabled",$searchWildcardsEnabled)
+    }
+    #searchStart
+    if($searchStart){
+        $getGroup.params.Add("startSearch",$searchStart)
+    }
+    #searchByAny
+    if($searchByAny){
+        $getGroup.params.Add("searchByAny",$searchByAny)
+    }
+    #groupids
+    if($groupids){
+        $getGroup.params.Add("groupids",$groupids)
+    }
+
+    $json = (ConvertTo-Json -InputObject $getGroup -Depth 100 ) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
-#Host Zabbix API
-function Get-HostsZabbixAPI {
+function Set-HostGroupsZabbixAPI {
     <#
+    .SYNOPSIS
+        ...
+    .PARAMETER Mode
+        Mode of action ADD or REMOVE. Example: -Mode Add
+    .PARAMETER GroupsId
+        Provide host groups. Example: -GroupsId "1,2,3,4"
+    .PARAMETER HostsId
+        Provide a list of hosts to add or remove from the host group. Example: -HostsId "12001,13002,14005"
+    .PARAMETER TemplatesId
+        Provide a list of templates to add or remove from the host group. Example: -TemplatesId "1,1001"
+    .PARAMETER WhatIf
+        Dispays a message describing the effect of the command, but does not execute it. Examle -WhatIf True
     .Example
-        #Output only the groups you are looking for.
-        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterHostName '"cgraf1,cgraf2"' | Format-Table
-        #Output all groups.
-        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 | Format-Table
+        Set-HostGroupsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -Mode Add -GroupsId "1004" -HostsId "12001,13002,14005"
     #>
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
         [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
         [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
-        [Parameter(Mandatory = $false, position = 3)][string]$filterHostName
+        [Parameter(Mandatory = $true, position = 3)][ValidateSet("Add","Remove")]$Mode,
+        [Parameter(Mandatory = $true, position = 4)][array]$GroupsId,
+        [Parameter(Mandatory = $false,position = 5)][array]$HostsId,
+        [Parameter(Mandatory = $false,position = 6)][array]$TemplatesId,
+        [Parameter(Mandatory = $false, position = 7)][ValidateSet($True, $False)]$WhatIf = $False
     )
-    $getHost = @{
-        "jsonrpc" = "2.0";
-        "method"  = "host.get";
-        "params"  = @{
-            "output"       = "extend"
-            "selectGroups" = "extend"     #Group member
-        };
-        "auth"    = $TokenApi;
-        "id"      = $TokenId;
-    }
-    #Filter
-    if ($filterHostName) {
-        $arrHS = @()
-        foreach ( $oneHS in ($filterHostName -split ",") ) {
-            $oneResHS = ('"' + $oneHS + '"')
-            $arrHS += $oneResHS
+    
+    if( $Mode -eq 'Add' ){
+        $setGroup = @{"jsonrpc" = "2.0"; "method" = "hostgroup.massadd"; "params" = @{}; "auth" = $TokenApi; "id" = $TokenId}
+        #Build element
+        function addElement($name, $listArr){       
+            $arrObjFun = @()
+            foreach ( $oneObj in ($listArr -split ",") ) {
+                $oneTXT = ('{"'+$name+'":"'+$oneObj+'"}')
+                $arrObjfun += $oneTXT
+            }
+            return $arrObjFun
         }
-        $addHS = $arrHS -join ","
-        $filterName = @{"host" = @("[$addHS ]") }
-        $getHost.params.Add("filter", $filterName)
+        #Add GroupsId
+        $addElementGroups = addElement 'groupid'  $GroupsId
+        $setGroup.params.Add("groups", @($addElementGroups) )
+        #Add HostsId
+        if($HostsId){
+            $addElementHosts = addElement 'hostid' $HostsId
+            $setGroup.params.Add("hosts", @($addElementHosts) )
+        }
+        #Add TemplatesId
+        if($TemplatesId){
+            $addElementHosts = addElement 'templateid' $TemplatesId
+            $setGroup.params.Add("templates", @($addElementHosts) )
+        }
     }
-    $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
-    $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    $res.result
+    if ( $Mode -eq 'Remove' ){
+        $setGroup = @{"jsonrpc" = "2.0"; "method" = "hostgroup.massremove"; "params" = @{}; "auth" = $TokenApi; "id" = $TokenId}
+        #Clear GroupsId
+        $setGroup.params.Add("groupids", @($GroupsId -replace ',','","' -replace '^','"' -replace '$','"'))
+        #Remove HostsId
+        if($HostsId){$setGroup.params.Add("hostids", @($HostsId -replace ',','","' -replace '^','"' -replace '$','"'))}
+        #Remove Templates
+        if($TemplatesId){$setGroup.params.Add("templateids", @($TemplatesId -replace ',','","' -replace '^','"' -replace '$','"'))}
+    }
+
+    $json = (ConvertTo-Json -InputObject $setGroup -Depth 100 ) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"' -replace '"{"','{"' -replace '"}"','"}'
+    If($WhatIf -eq $true){
+        return $json
+    }else{
+        $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+        if($res.error){
+            return $res.error
+        }else{ return $res.result }
+    }
+}
+#########################################
+#Host Zabbix API _v2
+function Get-HostsZabbixAPI {
+    <#
+    .PARAMETER searchWildcardsEnabled
+        If set to True, enables the use of "*" as a wildcard character in the search parameter. Example: -searchHostName "Host*" -searchWildcardsEnabled $True
+    .PARAMETER searchStart
+        The search parameter will compare the beginning of fields, that is, perform a LIKE "...%" search instead. Ignored if searchWildcardsEnabled is set to True. Example: -searchHostName "Host" -searchStart $True
+    .PARAMETER searchByAny
+        If set to true, return results that match any of the criteria given in the filter or search parameter instead of all of them. Example: -searchByAny $True
+    .Example
+        #Output only the hosts you are looking for (case sensitive).
+        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterHostName "host_1,host_2" | Format-Table
+    .Example
+        #Output all hosts.
+        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 | Format-Table
+    .Example
+        #Output only the hosts you are looking for (case-insensitive).
+        Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -searchHostName "hoSt_1,Host_2" | Format-Table
+
+    #>
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][string]$filterHostName,
+        [Parameter(Mandatory = $false, position = 4)][string]$searchHostName,
+        [Parameter(Mandatory = $false, position = 5)][string]$filterHostID,
+        #Search
+        [Parameter(Mandatory = $false, position = 6)][ValidateSet("True", "False")]$searchWildcardsEnabled,
+        [Parameter(Mandatory = $false, position = 7)][ValidateSet("True", "False")]$searchStart,
+        [Parameter(Mandatory = $false, position = 8)][ValidateSet("True", "False")]$searchByAny
+    )
+
+    function jsonGetHostCore(){
+        $getHostFn = @{
+            "jsonrpc" = "2.0";
+            "method"  = "host.get";
+            "params"  = @{
+                "output"       = "extend"
+                "selectGroups" = @("groupid","name")     #Group member
+                "selectInventory" = @("os")
+                "selectTags" = "extend"
+                #"selectTriggers" = "extend"
+                <#
+                main = 0 - not default; 1 - default.
+                type = 1 - agent; 2 - SNMP; 3 - IPMI; 4 - JMX.
+                useip = 0 - connect using host DNS name; 1 - connect using host IP address for this host interface.
+                available = 0 - (default) unknown; 1 - available; 2 - unavailable.
+                #>
+                "selectInterfaces" = @("main","type","useip","ip","dns","port","available")
+                "selectMacros" = @("macro","value")
+            };
+            "auth"    = $TokenApi;
+            "id"      = $TokenId;
+        }
+        return $getHostFn
+    }
+
+    function filterListPreparation($filterList) {
+        $arrFl = @() 
+        foreach ( $oneFl in ($filterList -split ",") ) {
+        $oneResFl = ('"' + $oneFl + '"')
+        $arrFl += $oneResFl
+        }
+        $addFl = $arrFl -join ","
+        return $addFl
+    }
+
+    #Search hosts.
+    if ($searchHostName) {
+        $arrSearchHS = @()
+        foreach ( $oneSearchHS in ($searchHostName -split ",") ) {
+            $filterSearchName = @{"host" = @($oneSearchHS)}
+            $getHostSearch = jsonGetHostCore
+            $getHostSearch.params.Add("search", $filterSearchName)
+
+            #searchWildcardsEnabled
+            if($searchWildcardsEnabled){
+                $getHostSearch.params.Add("searchWildcardsEnabled",$searchWildcardsEnabled)
+            }
+            #searchStart
+            if($searchStart){
+                $getHostSearch.params.Add("startSearch",$searchStart)
+            }
+            #searchByAny
+            if($searchByAny){
+                $getHostSearch.params.Add("searchByAny",$searchByAny)
+            }
+            
+            $json = (ConvertTo-Json -InputObject $getHostSearch) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+            $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+            $arrSearchHS += $res.result
+        } 
+        return $arrSearchHS
+    }
+    #Search for everything and by filter.
+    else {
+        $getHost = jsonGetHostCore
+        #Filter hosts.
+        if ($filterHostName) {
+            $addFilterHostName = filterListPreparation($filterHostName)
+            $filterName = @{"host" = @("[$addFilterHostName]") }
+            $getHost.params.Add("filter", $filterName)
+        }
+        #Filter hostsId.
+        if ($filterHostID) {
+            $addFilterHostID = filterListPreparation($filterHostID)
+            $filterID = @{"hostid" = @("[$addFilterHostID]") }
+            $getHost.params.Add("filter", $filterID)
+        }
+
+        #searchByAny
+        if($searchByAny){
+            $getHost.params.Add("searchByAny",$searchByAny)
+        }
+
+        $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+        $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+        if($res.error){
+            return $res.error
+        }else{ return $res.result }
+    }
 }
 #New Create Host to Zabbix API _v7
 function New-HostZabbixAPI {
@@ -188,6 +387,8 @@ function New-HostZabbixAPI {
         Enable Inventory data. Select Manual or automatic filling of inventory data. Example: -Inventory_Mode (switch select: Manual,Auto)
     .PARAMETER Macros
         Add custom MACROS in Host. Example: -Macros '{$USERID};123423;User ID,{$HOSTID};00001;Host ID}'
+    .PARAMETER Description
+        Add description object.
     .EXAMPLE
         #Use Agent interface.
         New-HostZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostName "Host" -IP "192.168.1.2" -DNS "Host.domain.info" -Group_HostId 2 -Proxy_HostId 10518 -Use_Agent -TemplateId 1001 -Tags "srv:SERVER,subsys:LINUX"
@@ -230,10 +431,11 @@ function New-HostZabbixAPI {
         [Parameter(Mandatory = $false, position = 19)][switch]$Use_IP_SNMP,
         [Parameter(Mandatory = $false, position = 20)][switch]$Use_IPMI, 
         [Parameter(Mandatory = $false, position = 21)][switch]$Use_IP_IPMI,
-        [Parameter(Mandatory = $false, position = 22)][string]$Tags, #Tags Host.
-        [Parameter(Mandatory = $false, position = 23)][array]$TemplateId, #Template.
-        [Parameter(Mandatory = $false, position = 24)][ValidateSet("Manual", "Auto")]$Inventory_Mode,                  #Enable Inventory data.
-        [Parameter(Mandatory = $false, position = 25)][array]$Macros #Users Custom Macros.
+        [Parameter(Mandatory = $false, position = 22)][string]$Tags,                                    #Tags Host.
+        [Parameter(Mandatory = $false, position = 23)][array]$TemplateId,                               #Template.
+        [Parameter(Mandatory = $false, position = 24)][ValidateSet("Manual", "Auto")]$Inventory_Mode,   #Enable Inventory data.
+        [Parameter(Mandatory = $false, position = 25)][array]$Macros,                                   #Users Custom Macros.
+        [Parameter(Mandatory = $false, position = 26)][string]$Description
     )
     ###Interface #######################################
     ##Agent Interfaces##
@@ -435,14 +637,20 @@ function New-HostZabbixAPI {
         $addMacros = $arrMacros -join ","
         $createHost.params.Add("macros", @($addMacros))
     }
+    #Add Description to JSON.
+    if ($Description) {
+        $createHost.params.Add("description", $Description)
+    }
+
     $jsonCreate = $createHost
     $json = (ConvertTo-Json -InputObject $jsonCreate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '\["{', '[{' -replace '}"\]', '}]' -replace '"{', '{' -replace '}"', '}'
     ###Create Host JSON END###############################
     ###Create Host########################################
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
-
 function Remove-HostsZabbixAPI {
     <#
     .Example
@@ -469,8 +677,33 @@ function Remove-HostsZabbixAPI {
 
     $json = (ConvertTo-Json -InputObject $removeHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
     $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
+<#In Developer
+#Massadd Host to Zabbix API _v1
+function Add-HostsZabbixAPI {
+
+    param(
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][int]$HostID
+    )
+
+    $massAddHosts = @{
+        "jsonrpc" = "2.0";
+        "method"  = "host.massadd";
+        "params"  = @{
+        };
+        "auth"    = $TokenApi;
+        "id"      = $TokenId;
+    }
+
+
+}
+#>
 
 #########################################
 #Working with Template Zabbix API.
@@ -511,7 +744,9 @@ function Get-TemplateZabbixAPI {
     }
     $json = (ConvertTo-Json -InputObject $getTemplate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
 
 #########################################
@@ -537,7 +772,9 @@ function Get-UserGroupZabbixAPI {
         [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
         [Parameter(Mandatory = $false, position = 3)][array]$filterUserGroup,
         [Parameter(Mandatory = $false, position = 4)][switch]$IncomingUsers,
-        [Parameter(Mandatory = $false, position = 5)][switch]$ReturnRights
+        [Parameter(Mandatory = $false, position = 5)][switch]$ReturnRights,
+        [Parameter(Mandatory = $false, position = 6)][switch]$ReturnTagFilters
+        
     )
     $getUserGroup = @{
         "jsonrpc" = "2.0";
@@ -557,7 +794,7 @@ function Get-UserGroupZabbixAPI {
             $arrUSGP += $oneResUSGP
         }
         $addUSGP = $arrUSGP -join ","
-        $filterName = @{"name" = @("[$addUSGP]") }
+        $filterName = @{"name" = @("$addUSGP") }
         $getUserGroup.params.Add("filter", $filterName)
     }
     #Members of the group.
@@ -568,10 +805,17 @@ function Get-UserGroupZabbixAPI {
     If ($ReturnRights) {
         $getUserGroup.params.Add("selectRights", "extend")
     }
-    $json = (ConvertTo-Json -InputObject $getUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    #Return permissions for a group of hosts. permission - the level of access rights to a tag filter of hosts
+    If ($ReturnTagFilters) {
+        $getUserGroup.params.Add("selectTagFilters", "extend")
+    }
+    $json = (ConvertTo-Json -InputObject $getUserGroup -Depth 100 ) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
+#New Group Users Zabbix API.
 function New-UserGroupZabbixAPI {
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
@@ -597,9 +841,135 @@ function New-UserGroupZabbixAPI {
         "auth"    = $TokenApi;
         "id"      = $TokenId
     }
-    $json = (ConvertTo-Json -InputObject $createUserGroup) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $json = (ConvertTo-Json -InputObject $createUserGroup -Depth 100) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
+}
+#Update Group Users Zabbix API.
+function Set-UserGroupZabbixAPI {
+    <#
+    .SYNOPSIS
+        ...
+    .PARAMETER usrgrpid
+        Select User Groups ID. Example -usrgrpid 543
+    .PARAMETER Permissions_groupid
+        Select the ID of the Host groups for which access will be granted. Example -Permissions_groupid "980,981,982"
+    .PARAMETER Permission_group
+        Select lever access - denied=0; read-only=2; read-write=3. Example: -Permission_group read-only
+    .PARAMETER ARR_Permission_groupid
+        Select array the ID of the Host groups for which access will be granted and lever access. Example: "2:980,2:981,3:982"
+    .PARAMETER tag_Filters_groupid
+        Select the ID of the Host groups for which access will be granted. Example -tag_Filters_groupid "980,981,982"
+    .PARAMETER tag_Filters_tagvalue
+        Select the tag:value of the Host groups for which access will be granted. Example -tag_Filters_tagvalue "tag1:value1,tag2:value2". Example all tag: -tag_Filters_tagvalue ""
+    .PARAMETER ARR_Filters_tagvalue_groupid
+        Select the tag:value:groupid of the Host groups for which access will be granted. Example -ARR_Filters_tagvalue_groupid 'tag1:value1:group1_id,tag2:value2:group2_id,::group3_id'
+    .PARAMETER WhatIf
+        Dispays a message describing the effect of the command, but does not execute it. Examle -WhatIf True
+    .Example
+        Set-UserGroupZabbixAPI "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -Permissions_groupid "980,981,982" -tag_Filters_groupid "980,981,982" -tag_Filters_tagvalue ""
+    #>
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][int]$usrgrpid,
+        ##Permissions
+        [Parameter(Mandatory = $false, position = 4)][string]$Permissions_groupid,
+        #0-denied; 2-read-only; 3-read-write
+        [Parameter(Mandatory = $false, position = 5)][ValidateSet("denied", "read-only", "read-write")]$Permission_group,
+        #Permissions ARR
+        [Parameter(Mandatory = $false, position = 6)][string]$ARR_Permission_groupid,
+        ##Tag Filter
+        [Parameter(Mandatory = $false, position = 7)][string]$tag_Filters_groupid,
+        [Parameter(Mandatory = $false, position = 8)][string]$tag_Filters_tagvalue,
+        #Tag Filter ARR
+        [Parameter(Mandatory = $false, position = 9)][string]$ARR_Filters_tagvalue_groupid,
+        [Parameter(Mandatory = $false, position = 10)][ValidateSet($True, $False)]$WhatIf = $False
+    )
+
+    $userGroupUpdate = @{
+        "jsonrpc" = "2.0";
+        "method"  = "usergroup.update";
+        "params"  = @{
+            "usrgrpid"     = $usrgrpid;
+        };
+        "auth"    = $TokenApi;
+        "id"      = $TokenId
+    }
+
+    $perm = switch ($Permission_group){
+        'denied'    { 0 }
+        'read-only' { 2 }
+        'read-write'{ 3 }
+    }
+
+    #Permissions
+    if ($Permissions_groupid){
+        $arrHGR = @()
+        foreach ( $oneHGR in ($Permissions_groupid -split ",") ) {
+            $oneResHGR = ( '{"id":"'+ $oneHGR +'","permission":' + $perm +'}')
+            $arrHGR += $oneResHGR
+        }
+        $addHGR = $arrHGR -join ","
+        $userGroupUpdate.params.Add("rights", "[$addHGR]")
+    }
+    #Permissions ARR
+    if ($ARR_Permission_groupid){
+        $arrHGR2 = @()
+        foreach ( $oneHGR2 in ($ARR_Permission_groupid -split ",") ) {
+
+            $oneHGR_perm = ($oneHGR2 -split ":")[0]
+            $oneHGR_id   = ($oneHGR2 -split ":")[1]
+
+            $oneResHGR2 = ( '{"id":"'+ $oneHGR_id +'","permission":' + $oneHGR_perm +'}')
+            $arrHGR2 += $oneResHGR2
+        }
+        $addHGR2 = $arrHGR2 -join ","
+        $userGroupUpdate.params.Add("rights", "[$addHGR2]")
+    }
+    #Tag filter
+    if($tag_Filters_groupid) {
+        $arrTags = @()
+        foreach( $oneTagGRP in ($tag_Filters_groupid -split ",") ) {
+            $arrTagValue = @()
+            foreach ( $oneTagValue in ($tag_Filters_tagValue -split ",") ){  
+                $jsonTagValue = $oneTagValue -split ":"
+                $oneResTGRP = ( '{"groupid":'+  $oneTagGRP +',"tag":"'+ $jsonTagValue[0] +'","value":"'+ $jsonTagValue[1] +'"}' )
+                $arrTagValue += $oneResTGRP
+            }
+            $arrTags += $arrTagValue
+        }
+        $addTags = $arrTags -join ","
+        $userGroupUpdate.params.Add("tag_filters","[$addTags]")
+    }
+    #Tag filter ARR, format tag:value:groupid
+    if($ARR_Filters_tagvalue_groupid){
+        $arrTags2 = @()
+        foreach( $oneTagGRP2 in ($ARR_Filters_tagvalue_groupid -split ',')){
+            $oneTag     = ($oneTagGRP2 -split ':')[0]
+            $oneValue   = ($oneTagGRP2 -split ':')[1]
+            $oneGroupid = ($oneTagGRP2 -split ':')[2]
+
+            $oneResTGRP2 = ( '{"groupid":'+  $oneGroupid +',"tag":"'+ $oneTag +'","value":"'+ $oneValue +'"}' )
+            $arrTags2 += $oneResTGRP2
+        }
+        $addTags2 = $arrTags2 -join ","
+        $userGroupUpdate.params.Add("tag_filters","[$addTags2]")
+    }
+
+    $json = (ConvertTo-Json -InputObject $userGroupUpdate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    #WhatIf
+    if($WhatIf -eq $true){
+        $json 
+    }else {
+        $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+        if($res.error){
+            return $res.error
+        }else{ return $res.result }
+    }
 }
 
 #########################################
@@ -647,7 +1017,7 @@ function Get-UserZabbixAPI {
             $arrUS += $oneResUS
         }
         $addUS = $arrUS -join ","
-        $filterName = @{"username" = @("[$addUS]") }
+        $filterName = @{"username" = @($addUS) }
         $getUser.params.Add("filter", $filterName)
     }
     #Return user alerts that are used by the user.
@@ -662,9 +1032,11 @@ function Get-UserZabbixAPI {
     If ($SelectUsrGrps) {
         $getUser.params.Add("selectUsrgrps", "extend")
     }
-    $json = (ConvertTo-Json -InputObject $getUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $json = (ConvertTo-Json -InputObject $getUser -Depth 100) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
 function New-UserZabbixAPI {
     <#
@@ -721,9 +1093,11 @@ function New-UserZabbixAPI {
         $createUser.params.Add("surname", $NewUserSurname)
     }
 
-    $json = (ConvertTo-Json -InputObject $createUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"\{', '{' -replace '\}"', '}'
+    $json = (ConvertTo-Json -InputObject $createUser -Depth 100) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"\{', '{' -replace '\}"', '}'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
 function Remove-UserZabbixAPI {
     <#
@@ -757,7 +1131,9 @@ function Remove-UserZabbixAPI {
     }
     $json = (ConvertTo-Json -InputObject $delUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
 function Set-UserZabbixAPI {
     <#
@@ -837,11 +1213,12 @@ function Set-UserZabbixAPI {
         $addUGC = $arrUGC -join ","
         $updateUser.params.Add("usrgrps", "[$addUGC]")
     }
-    $json = (ConvertTo-Json -InputObject $updateUser) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"\{', '{' -replace '\}"', '}'
+    $json = (ConvertTo-Json -InputObject $updateUser -Depth 100) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"\{', '{' -replace '\}"', '}'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
-
 #########################################
 #Working with User Roles Zabbix API.
 function Get-UserRoleZabbixAPI {
@@ -888,9 +1265,10 @@ function Get-UserRoleZabbixAPI {
     }
     $json = (ConvertTo-Json -InputObject $getRole) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
-
 #########################################
 #Working with Maintenance Zabbix API.
 function Get-MaintenanceZabbixAPI {
@@ -913,10 +1291,22 @@ function Get-MaintenanceZabbixAPI {
         Return only maintenances that are assigned to the given host groups. Example: -FindGroupIds "2324,2453"
     .PARAMETER FindMaintenanceIds
         Return only maintenances with the given IDs. Example: -FindMaintenanceIds "4555,6555"
+    .PARAMETER SearchDescription
+        Return list maintenances with the given Description. Example: -SearchDescription "Find maintenance number 3456" or Example: -SearchDescription "number 3456"
+    .PARAMETER SearchMaintenance
+        Return list maintenances with the given Name. Example: -SearchMaintenance "mainte"
+    .PARAMETER searchWildcardsEnabled
+        If set to True, enables the use of "*" as a wildcard character in the search parameter.
+    .PARAMETER searchStart
+        The search parameter will compare the beginning of fields, that is, perform a LIKE "...%" search instead. Ignored if searchWildcardsEnabled is set to True.
+    .PARAMETER searchByAny
+        If set to true, return results that match any of the criteria given in the filter or search parameter instead of all of them.
     .Example
         Get-MaintenanceZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid
     .Example
         Get-MaintenanceZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -FilterMaintenance "maintenance1,maintenance2"
+    .Example
+        Get-MaintenanceZabbixAPI -UrlApi "http://zabbix.domain.local/zabbix/api_jsonrpc.php" -TokenApi Past_TokenApi -TokenId Past_Tokenid -SearchMaintenance "mainte"
     #>
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
@@ -929,7 +1319,12 @@ function Get-MaintenanceZabbixAPI {
         [Parameter(Mandatory = $false, position = 7)][array]$FilterMaintenance,
         [Parameter(Mandatory = $false, position = 8)][array]$FindHostIds,
         [Parameter(Mandatory = $false, position = 9)][array]$FindGroupIds,
-        [Parameter(Mandatory = $false, position = 10)][array]$FindMaintenanceIds
+        [Parameter(Mandatory = $false, position = 10)][array]$FindMaintenanceIds,
+        [Parameter(Mandatory = $false, position = 11)][string]$SearchDescription,
+        [Parameter(Mandatory = $false, position = 12)][string]$SearchMaintenance,
+        [Parameter(Mandatory = $false, position = 13)][ValidateSet("True", "False")]$searchWildcardsEnabled,
+        [Parameter(Mandatory = $false, position = 14)][ValidateSet("True", "False")]$searchStart,
+        [Parameter(Mandatory = $false, position = 15)][ValidateSet("True", "False")]$searchByAny
     )
     $getMaintenance = @{
         "jsonrpc" = "2.0";
@@ -940,23 +1335,16 @@ function Get-MaintenanceZabbixAPI {
         "auth"    = $TokenApi;
         "id"      = $TokenId
     }
-    If ($SelectGroups) {
-        $getMaintenance.params.Add("selectGroups", "extend")
-    }
-    If ($SelectHosts) {
-        $getMaintenance.params.Add("selectHosts", "extend")
-    }
-    If ($SelectTimeperiods) {
-        $getMaintenance.params.Add("selectTimeperiods", "extend")
-    }
-    If ($SelectTags) {
-        $getMaintenance.params.Add("selectTags", "extend")
-    }
+    If ($SelectGroups){$getMaintenance.params.Add("selectGroups", "extend")}
+    If ($SelectHosts) {$getMaintenance.params.Add("selectHosts", "extend")}
+    If ($SelectTimeperiods) {$getMaintenance.params.Add("selectTimeperiods", "extend")}
+    If ($SelectTags) {$getMaintenance.params.Add("selectTags", "extend")}
     #Filter
     if ($FilterMaintenance) {
         $arrMT = @()
         foreach ( $oneMT in ($FilterMaintenance -split ",") ) {
-            $oneResMT = ('"' + $oneMT + '"')
+            #Trim $oneMT to 128 characters.
+            $oneResMT = ('"' + [string]$oneMT.Substring(0, [System.Math]::Min(128, $oneMT.length)) + '"')
             $arrMT += $oneResMT
         }
         $addMT = $arrMT -join ","
@@ -977,10 +1365,28 @@ function Get-MaintenanceZabbixAPI {
     if ($FindMaintenanceIds) {
         $addFindM = $FindMaintenanceIds -replace "\s"
         $getMaintenance.params.Add("maintenanceids", "[$addFindM]")
-    } 
+    }
+    #searchDescription  or SearchMaintenance
+    if ($searchDescription -or $SearchMaintenance){
+        $getMaintenance.params.Add("search",@{})
+        if($searchDescription){
+            $getMaintenance.params.search.Add("description", @($searchDescription))
+        }
+        if($SearchMaintenance){
+            #Trim $SearchMaintenance to 128 characters.
+            $getMaintenance.params.search.Add("name", @( [string]$SearchMaintenance.Substring(0, [System.Math]::Min(128, $SearchMaintenance.length)) ))
+        }
+    }
+    #searchWildcardsEnabled or searchStart or searchByAny
+    if($searchWildcardsEnabled){$getMaintenance.params.Add("searchWildcardsEnabled",$searchWildcardsEnabled)}
+    if($searchStart){$getMaintenance.params.Add("startSearch",$searchStart)}
+    if($searchByAny){$getMaintenance.params.Add("searchByAny",$searchByAny)}
+
     $json = (ConvertTo-Json -InputObject $getMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
 function New-MaintenanceZabbixAPI {
     <#
@@ -989,32 +1395,48 @@ function New-MaintenanceZabbixAPI {
     .PARAMETER NameMaintenance
         Name Maintenance. Example: -NameMaintenance "Maintenance_1"
     .PARAMETER ActiveSince
-        Time when the maintenance becomes active. Example: -ActiveSince "31.10.2022 09:00"
+        Time when the maintenance becomes active. Example: -ActiveSince "20.04.2024 00:00"
     .PARAMETER ActiveTill
-        Time when the maintenance stops being active. Example: -ActiveTill "22.11.2022 18:00"
+        Time when the maintenance stops being active. Example: -ActiveTill "20.05.2024 00:00"
     .PARAMETER MaintenanceType
         Type of maintenance. Possible values: WithData - (default) with data collection; NoData - without data collection. Example: -MaintenanceType NoData
-    .PARAMETER groupids
+    .PARAMETER GroupIds
         Host groups that will undergo maintenance. The host groups must have the groupid property defined. At least one object of groups or hosts must be specified. Example: -GroupIds "31,34,121"
-    .PARAMETER hostids
+    .PARAMETER HostIds
         Hosts that will undergo maintenance.The hosts must have the hostid property defined. At least one object of groups or hosts must be specified. Example: -HostIds "13123,4456" 
+    .PARAMETER Timeperiod_type
+        "One time only"=0, "daily"=2, "weekly"=3, "mounthly"=4.Release only "One time only". Example: -Timeperiod_type 0
+    .PARAMETER Start_date
+        Datetime start period. Example: -Start_date "25.04.20024 23:00"
+    .PARAMETER Period
+        Maintenance period scheduled, parameters day-1d, or hours-1h or minutes-30m. Example: -Period 1d. Example -Period 1d;6h;30m
+    .PARAMETER Description
+        ...
+    .PARAMETER WhatIf
+        Dispays a message describing the effect of the command, but does not execute it. Examle -WhatIf True
     #>
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
         [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
         [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
-        [Parameter(Mandatory = $true, position = 3)][string]$NameMaintenance,
-        [Parameter(Mandatory = $true, position = 4)][datetime]$ActiveSince,
-        [Parameter(Mandatory = $true, position = 5)][datetime]$ActiveTill,
+        [Parameter(Mandatory = $true, position = 3)][string]$NameMaintenance ,
+        [Parameter(Mandatory = $true, position = 4)][string]$ActiveSince,
+        [Parameter(Mandatory = $true, position = 5)][string]$ActiveTill,
         [Parameter(Mandatory = $false, position = 6)][ValidateSet("WithData", "NoData")]$MaintenanceType,
         [Parameter(Mandatory = $false, position = 7)][array]$GroupIds,
-        [Parameter(Mandatory = $false, position = 8)][array]$HostIds
+        [Parameter(Mandatory = $false, position = 8)][array]$HostIds,
+        #Periods for only=0
+        #One time only=0, daily=2, weekly=3, mounthly=4
+        [Parameter(Mandatory = $true, position = 9)][ValidateSet(0)]$Timeperiod_type,
+        [Parameter(Mandatory = $false, position = 10)][string]$Start_date,
+        #1d or 2h or 30m
+        [Parameter(Mandatory = $false, position = 11)][string]$Period,
+        #Description
+        [Parameter(Mandatory = $false, position = 12)][string]$Description,
+        [Parameter(Mandatory = $false, position = 13)][ValidateSet($True, $False)]$WhatIf = $False
     )
-
-    try {  
-        $ErrorActionPreference = "Stop"
-        $AS = Get-Date $ActiveSince -UFormat %s
-        $AT = Get-Date $ActiveTill -UFormat %s
+        $AS = (Get-Date $ActiveSince -UFormat %s) - 10800
+        $AT = (Get-Date $ActiveTill -UFormat %s) - 10800
 
         switch ($MaintenanceType) {
             "NoData" { $mType = 1 }
@@ -1022,11 +1444,13 @@ function New-MaintenanceZabbixAPI {
             Default { $mType = 0 }
         }
 
+        $NameMaintenanceJ = $NameMaintenance.Substring(0, [System.Math]::Min(128, $NameMaintenance.length))
+
         $createMaintenance = @{
             "jsonrpc" = "2.0";
             "method"  = "maintenance.create";
             "params"  = @{
-                "name"             = "$NameMaintenance";
+                "name"             = "$NameMaintenanceJ";
                 "active_since"     = $AS;
                 "active_till"      = $AT;
                 "maintenance_type" = $mType
@@ -1035,27 +1459,33 @@ function New-MaintenanceZabbixAPI {
             "id"      = $TokenId
         }
 
-        #Add periods
-        $periodTimeType = 0
-        $periodEvery = 1
-        $periodMonth = 0
-        $periodDayofweek = 0
-        $periodDay = 0
-        $periodStartTime = 0
-        $Period = 31536000
-        $periodStartDate = $AS
-        $periods = @{
-            "timeperiod_type" = $periodTimeType
-            "every"           = $periodEvery
-            "month"           = $periodMonth
-            "dayofweek"       = $periodDayofweek
-            "day"             = $periodDay
-            "start_time"      = $periodStartTime
-            "period"          = $Period
-            "start_date"      = $periodStartDate
+        #Periods for only=0
+        if( $Timeperiod_type -eq 0){
+            #Converting the launch date and time to unix format.
+            $periodStartDate = (Get-Date $Start_date -UFormat %s) - 10800
+
+            #Period time tranclate it into seconds.
+            $periods = $Period -split ';'
+            $arrPeriod = @()
+            foreach ($onePeriod in $periods){
+                    if     ( $onePeriod -like "*d" ){ $fPeriod = [int]($onePeriod -replace "d") * 86400 }
+                    elseif ( $onePeriod -like "*h" ){ $fPeriod = [int]($onePeriod -replace "h") * 3600  }
+                    elseif ( $onePeriod -like "*m" ){ $fPeriod = [int]($onePeriod -replace "m") * 60    }
+                    else   { $fPeriod = 3600 }
+                    $arrPeriod += $fPeriod
+                }
+            $fPeriodR = ($arrPeriod | Measure-Object -Sum).sum
+
+            #Add periods
+            $periods = @{
+                "timeperiod_type" = $Timeperiod_type
+                "period"          = $fPeriodR
+                "start_date"      = $periodStartDate  
+            }
+            
+            $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
+            $createMaintenance.params.Add("timeperiods", @($jsonPeriods))
         }
-        $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
-        $createMaintenance.params.Add("timeperiods", @($jsonPeriods))
 
         #Add groupids or hostids
         $findVar = ($GroupIds + $HostIds)      
@@ -1064,25 +1494,68 @@ function New-MaintenanceZabbixAPI {
         }
         else {
             if ($GroupIds) {
-                $cGroupids = $GroupIds -replace "\s"
-                $createMaintenance.params.Add("groupids", @($cGroupids))
+                $arrGroupId = @()
+                foreach( $oneGroupId in ($GroupIds -split ",") ){
+                    $resGroupId = ( '{"groupid":"' + $oneGroupId + '"}' )
+                    $arrGroupId += $resGroupId
+                }
+                $addGroupId = $arrGroupId -join ","
+                $createMaintenance.params.Add("groups", @($addGroupId))
             }
             if ($HostIds) {
-                $cHostids = $HostIds -replace "\s"
-                $createMaintenance.params.Add("hostids", @($cHostids))
+                $arrHostId = @()
+                foreach( $oneHostId in ($HostIds -split ",") ){
+                    $resHostId = ( '{"hostid":"' + $oneHostId + '"}' )
+                    $arrHostId += $resHostId
+                }
+                $addHostId = $arrHostId -join ","
+                $createMaintenance.params.Add("hosts", @($addHostId))
             }
         }
 
-        $json = (ConvertTo-Json -InputObject $createMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
-        $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-        return $res.result
-    }
-    catch {
-        $err = $error[0] | format-list -Force
-        $err
-    }
+        #Description
+        if($Description){
+            $createMaintenance.params.Add("description", $Description)
+        }
+
+        $json = (ConvertTo-Json -InputObject $createMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"{', '{' -replace '}"', '}'
+        If($WhatIf -eq $true){
+            return $json
+        }else{
+            $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+            if($res.error){
+                return $res.error
+            }else{ return $res.result }
+        }
 }
-function Update-MaintenanceZabbixAPI {
+#Set Maintenance Zabbix API _v3
+function Set-MaintenanceZabbixAPI {
+    <#
+    .SYNOPSIS
+        This method allows to create new maintenances, via Zabbix API
+    .PARAMETER NameMaintenance
+        Name Maintenance. Example: -NameMaintenance "Maintenance_1"
+    .PARAMETER ActiveSince
+        Time when the maintenance becomes active. Example: -ActiveSince "20.04.2024 00:00"
+    .PARAMETER ActiveTill
+        Time when the maintenance stops being active. Example: -ActiveTill "20.05.2024 00:00"
+    .PARAMETER MaintenanceType
+        Type of maintenance. Possible values: WithData - (default) with data collection; NoData - without data collection. Example: -MaintenanceType NoData
+    .PARAMETER GroupIds
+        Host groups that will undergo maintenance. The host groups must have the groupid property defined. At least one object of groups or hosts must be specified. Example: -GroupIds "31,34,121"
+    .PARAMETER HostIds
+        Hosts that will undergo maintenance.The hosts must have the hostid property defined. At least one object of groups or hosts must be specified. Example: -HostIds "13123,4456" 
+    .PARAMETER Timeperiod_type
+        "One time only"=0, "daily"=2, "weekly"=3, "mounthly"=4.Release only "One time only". Example: -Timeperiod_type 0
+    .PARAMETER Start_date
+        Datetime start period. Example: -Start_date "25.04.20024 23:00"
+    .PARAMETER Period
+        Maintenance period scheduled, parameters day-1d, or hours-1h or minutes-30m. Example: -Period 1d. Example -Period 1d;6h;30m
+    .PARAMETER PeriodJSON
+        Example: [{"timeperiod_type":"0","every":"1","month":"0","dayofweek":"0","day":"0","start_time":"0","period":"40200","start_date":"1695189000"}] 
+    .PARAMETER WhatIf
+        Dispays a message describing the effect of the command, but does not execute it. Examle -WhatIf True
+    #>
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
         [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
@@ -1092,8 +1565,16 @@ function Update-MaintenanceZabbixAPI {
         [Parameter(Mandatory = $false, position = 5)][datetime]$ActiveSince,
         [Parameter(Mandatory = $false, position = 6)][datetime]$ActiveTill,
         [Parameter(Mandatory = $false, position = 7)][ValidateSet("WithData", "NoData")]$MaintenanceType,
-        [Parameter(Mandatory = $false, position = 8)][array]$groupids,
-        [Parameter(Mandatory = $false, position = 9)][array]$hostids
+        [Parameter(Mandatory = $false, position = 8)][array]$GroupIds,
+        [Parameter(Mandatory = $false, position = 9)][array]$HostIds,
+        #Periods
+        #One time only = 0, Daily = 2, Weekly = 3, Monthly = 4.
+        [Parameter(Mandatory = $false, position = 10)][ValidateSet(0)][int]$timeperiod_type,
+        [Parameter(Mandatory = $false, position = 11)][string]$Start_date,
+        [Parameter(Mandatory = $false, position = 12)][string]$Period,
+        #PeriodsJSON
+        [Parameter(Mandatory = $false, position = 13)][string]$PeriodJSON,
+        [Parameter(Mandatory = $false, position = 14)][ValidateSet($True, $False)]$WhatIf = $False
     )
     $updateMaintenance = @{
         "jsonrpc" = "2.0";
@@ -1106,7 +1587,7 @@ function Update-MaintenanceZabbixAPI {
     }
     #name
     if ($NameMaintenance) {
-        $updateMaintenance.params.add("name", $NameMaintenance)
+        $updateMaintenance.params.add("name", $NameMaintenance.Substring(0, [System.Math]::Min(128, $NameMaintenance.length)) )
     }
     #active_since
     if ($ActiveSince) {
@@ -1137,32 +1618,61 @@ function Update-MaintenanceZabbixAPI {
         $updateMaintenance.params.Add("hostids", @($cHostids))
     }
 
-    <#
-        #Add periods
-        $periodTimeType = 0
-        $periodEvery = 1
-        $periodMonth = 0
-        $periodDayofweek = 0
-        $periodDay = 0
-        $periodStartTime = 0
-        $Period = 31536000
-        $periodStartDate = $AS
-        $periods = @{
-            "timeperiod_type"=$periodTimeType
-            "every"=$periodEvery
-            "month"=$periodMonth
-            "dayofweek"=$periodDayofweek
-            "day"=$periodDay
-            "start_time"=$periodStartTime
-            "period"=$Period
-            "start_date"=$periodStartDate
+    function manualPeriods{ 
+        #Time calculation set by the user in the format dd.MM.yyyy hh:mm 
+        param ( $timeperiod_type, $Start_date, $Period )
+        #Start maintenance date.
+        $fDate = (Get-Date $start_date).addHours(-3) ; 
+        $fDateJ = Get-Date $fDate -UFormat %s
+    
+        #Period time.
+        $periods = $Period -split ';'
+        $arrPeriod = @()
+        foreach ($onePeriod in $periods){
+            #Period time.
+            if     ( $onePeriod -like "*d" ){ $fPeriod = [int]($onePeriod -replace "d") * 86400 }
+            elseif ( $onePeriod -like "*h" ){ $fPeriod = [int]($onePeriod -replace "h") * 3600  }
+            elseif ( $onePeriod -like "*m" ){ $fPeriod = [int]($onePeriod -replace "m") * 60    }
+            else   { $fPeriod = 3600 }
+            $arrPeriod += $fPeriod
         }
-        $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{','{' -replace '}"','}'
-        $updateMaintenance.params.Add("timeperiods",@($jsonPeriods))
-        #>
-    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
-    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+        $fPeriodR = ($arrPeriod | Measure-Object -Sum).sum
+         
+        $periodObj = @{        
+            #One time only = 0, Daily = 2, Weekly = 3, Monthly = 4.
+            "timeperiod_type" = $timeperiod_type
+            #"every"=$periodEvery   #"month"=$periodMonth   #"dayofweek"=$periodDayofweek   #"day"=$periodDay   #"start_time"=$periodStartTime
+            "period" = $fPeriodR
+            "start_date" = $fDateJ
+        }
+        return $periodObj
+    }
+    #If only variables are present $timeperiod_type , $Start_date , $Period
+    if($timeperiod_type -match '\w' -and $Start_date -match '\w' -and $Period -match '\w' -and $PeriodJSON -notmatch '\w' ){   
+        $resultPeriods = (manualPeriods -timeperiod_type $timeperiod_type -Start_date $Start_date -Period $Period) | ConvertTo-Json
+    }
+    #If only variables are present $PeriodJSON 
+    if ($PeriodJSON -match '\w' -and $timeperiod_type -notmatch '\w' -and $Start_date -notmatch '\w' -and $Period -notmatch '\w') { 
+        $resultPeriods = $PeriodJSON
+    }
+    #If all variables are present $timeperiod_type , $Start_date , $Period , $PeriodJSON 
+    if ($timeperiod_type -match '\w' -and $Start_date -match '\w' -and $Period -match '\w' -and $PeriodJSON -match '\w') { 
+       [array]$arrPeriodJSON = $PeriodJSON | ConvertFrom-Json
+       $arrPeriodManual = (manualPeriods -timeperiod_type $timeperiod_type -Start_date $Start_date -Period $Period) | ConvertTo-Json | ConvertFrom-Json
+       $arrPeriodsJoin = $arrPeriodJSON + $arrPeriodManual
+       $resultPeriods = $arrPeriodsJoin | ConvertTo-Json
+    }
+    $updateMaintenance.params.Add("timeperiods",@($resultPeriods))
+    
+    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"{','{' -replace '}"','}'
+    If($WhatIf -eq $true){
+        return $json
+    }else{
+        $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+        if($res.error){
+            return $res.error
+        }else{ return $res.result }
+    }
 }
 function Remove-MaintenanceZabbixAPI {
     param (
@@ -1183,9 +1693,10 @@ function Remove-MaintenanceZabbixAPI {
 
     $json = (ConvertTo-Json -InputObject $deleteMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
-
 #########################################
 #Working with Item Zabbix API.
 function New-ItemZabbixAPI {
@@ -1245,24 +1756,78 @@ function New-ItemZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-
 function Get-ItemZabbixAPI {
+    <#
+    .SYNOPSIS
+        ...
+    .PARAMETER Item
+        Required parameter. Select item is Static or is Prototype (created in discovery). 
+    .PARAMETER Hosts
+        Return only items that belong to a host with the given name. Return only items that belong to the given hosts.
+    .PARAMETER Groupids
+        Return only items that belong to the hosts from the given groups.
+    .PARAMETER GroupName
+        Return only items that belong to a group with the given name.
+    .PARAMETER Templated
+        Return only items that belong to the given templates.
+    .PARAMETER Webitems
+        Include web items in the result.
+    .PARAMETER Inherited
+        If set to true return only items inherited from a template.
+    .PARAMETER Templated
+        If set to true return only items that belong to templates.
+    .PARAMETER Monitored
+        If set to true return only enabled items that belong to monitored hosts.
+    .PARAMETER With_triggers
+        If set to true return only items that are used in triggers.
+    #>
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
         [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
         [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
-        [Parameter(Mandatory = $true, position = 3)]$Hosts
-        
+        [Parameter(Mandatory = $true, position = 3)][ValidateSet('Static', 'Prototype')]$Item,
+        #Возврат только тех элементов данных, которые принадлежат заданным узлам сети hostid\host.
+        [Parameter(Mandatory = $false, position = 4)]$Hosts,
+        #Возврат только тех элементов данных, которые принадлежат узлам сети с заданных групп узлов сети.
+        [Parameter(Mandatory = $false, position = 5)][int]$Groupids,
+        [Parameter(Mandatory = $false, position = 6)][string]$GroupName,
+        #Возврат только тех элементов данных, которые принадлежат заданным шаблонам. строка/массив
+        [Parameter(Mandatory = $false, position = 7)][int]$Templateids,
+        #Включение в результат веб элементов данных. Enable=1
+        [Parameter(Mandatory = $false, position = 8)][switch]$Webitems,
+        #Если задано значение true, возвращать только те элементы, которые унаследованы из шаблона.
+        [Parameter(Mandatory = $false, position = 9)][ValidateSet('true', 'false')]$Inherited,
+        #Если задано значение true, возвращать только те элементы, которые принадлежат шаблонам.
+        [Parameter(Mandatory = $false, position = 10)][ValidateSet('true', 'false')]$Templated,
+        #Если задано значение true, возвращать только активированные элементы данных, которые принадлежат узлам сети под наблюдением.
+        [Parameter(Mandatory = $false, position = 11)][ValidateSet('true', 'false')]$Monitored,
+        #Если задано значение true, возвращать только те элементы данных, которые используются в триггерах.
+        [Parameter(Mandatory = $false, position = 12)][ValidateSet('true', 'false')]$With_triggers
     )
-    $itemGet = @{
-        "jsonrpc" = "2.0";
-        "method" = "item.get";
-        "params" = @{
-            "output" = "extend";         
-            "sortfield" = "name"
-        };
-        "auth" = $TokenApi;
-        "id" = $TokenId
+
+    if($Item -eq 'Static'){
+        $itemGet = @{
+            "jsonrpc" = "2.0";
+            "method" = "item.get";
+            "params" = @{
+                "output" = "extend";         
+                "sortfield" = "name"
+            };
+            "auth" = $TokenApi;
+            "id" = $TokenId
+        }
+    }
+    if($Item -eq 'Prototype'){
+        $itemGet = @{
+            "jsonrpc" = "2.0";
+            "method" = "itemprototype.get";
+            "params" = @{
+                "output" = "extend";         
+                "sortfield" = "name"
+            };
+            "auth" = $TokenApi;
+            "id" = $TokenId
+        }
     }
     
     if ( $Hosts.GetType().Name -eq "String" ) {
@@ -1271,12 +1836,25 @@ function Get-ItemZabbixAPI {
     if ( $Hosts.GetType().Name -eq "Int32" ) {
         $itemGet.params.Add("hostids",$Hosts)
     }
+    #Group
+    if($Groupids){ $itemGet.params.Add("groupids", $Groupids)}
+    if($GroupName){ $itemGet.params.Add("group", $GroupName)}
+    #Template
+    if($Templateids){ $itemGet.params.Add("templateids", $Templateids)}
+    ###
+    if($Webitems){ $itemGet.params.Add("webitems", 1)}
+    if($Inherited){ $itemGet.params.Add("inherited", $Inherited)}
+    if($Templated){ $itemGet.params.Add("templated", $Templated)}
+    if($Monitored){ $itemGet.params.Add("monitored", $Monitored)}
+    if($With_triggers){ $itemGet.params.Add("with_triggers", $With_triggers)}
+
      
     $json = (ConvertTo-Json -InputObject $itemGet) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
-
 #########################################
 #Working with Trigger Zabbix API.
 function New-TriggerZabbixAPI {
@@ -1306,7 +1884,146 @@ function New-TriggerZabbixAPI {
     } 
     $json = (ConvertTo-Json -InputObject $createTrigger) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
+}
+function Get-TriggerZabbixAPI{
+    <#
+    .SYNOPSIS
+        ...
+    .PARAMETER Trigger
+        Required parameter. Select triger is Static or is Prototype (created in discovery). Example -Trigger Static
+    .PARAMETER Templateids
+        Return only triggers that belong to the given templates
+    .PARAMETER Inherited
+        If set to true return only triggers inherited from a template
+    .PARAMETER Templated
+        If set to true return only triggers that belong to templates
+    .PARAMETER Monitored
+        Return only enabled triggers that belong to monitored hosts and contain only enabled items
+    .PARAMETER Active
+        Return only enabled triggers that belong to monitored hosts
+    .PARAMETER Only_true
+        Return only triggers that have recently been in a problem state
+    .PARAMETER ExpandComment
+        Expand macros in the trigger description.
+    .PARAMETER ExpandDescription
+        Expand macros in the name of the trigger
+    .PARAMETER ExpandExpression
+        Expand functions and macros in the trigger expression
+    .PARAMETER ExpandTags
+        Expand Tag in the trigger
+    .PARAMETER ExpandItems
+        Return items contained by the trigger in the items property
+    .PARAMETER Legend
+        Return Legend for status, value, priority
+    .EXAMPLE
+        Get-TriggerZabbixAPI -urlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -Trigger Static -HostName host.domain.local -Monitored -expandComment -expandDescription -selectTags
+    #>
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+
+        [Parameter(Mandatory = $true, position = 3)][ValidateSet('Static', 'Prototype')]$Trigger,
+
+        #Возврат только тех триггеров, которые принадлежат заданным узлам сети.
+        [Parameter(Mandatory = $false, position = 4)][int]$Hostids,
+        [Parameter(Mandatory = $false, position = 5)][string]$HostName,
+        #Возврат только тех триггеров, которые принадлежат узлам сети из заданных групп узлов сети.
+        [Parameter(Mandatory = $false, position = 6)][int]$Groupids,
+        [Parameter(Mandatory = $false, position = 7)][string]$GroupName,
+        #Возврат только тех триггеров, которые принадлежат заданным шаблонам.
+        [Parameter(Mandatory = $false, position = 8, HelpMessage='Return only triggers that belong to the given templates')][int]$Templateids,
+        [Parameter(Mandatory = $false, position = 9)][switch]$ExpandTriggerDiscovery,
+
+        #Если задано значение true, возвращать только те триггеры, которые унаследованы из шаблона.
+        [Parameter(Mandatory = $false, position = 10, HelpMessage='If set to true return only triggers inherited from a template')][ValidateSet('true', 'false')]$Inherited,
+        #Если задано значение true, возвращать только те триггеры, которые принадлежат шаблонам.
+        [Parameter(Mandatory = $false, position = 11, HelpMessage='If set to true return only triggers that belong to templates')][ValidateSet('true', 'false')]$Templated,
+
+        #Возврат только активированных триггеров, которые принадлежат узлам сети под наблюдением и содержат только активированные элементы данных. Enable=1
+        [Parameter(Mandatory = $false, position = 12, HelpMessage='Return only enabled triggers that belong to monitored hosts and contain only enabled items')][switch]$Monitored,
+        #Возврат только активированных триггеров, которые принадлежат узлам сети под наблюдением. Enable=1
+        [Parameter(Mandatory = $false, position = 13, HelpMessage='Return only enabled triggers that belong to monitored hosts')][switch]$Active,
+        #Возврат только тех триггеров, которые недавно были в состоянии проблема. Enable=1
+        [Parameter(Mandatory = $false, position = 14, HelpMessage='Return only triggers that have recently been in a problem state')][switch]$Only_true,
+
+        #Раскрытие макросов в описании к триггеру. Enable=1
+        [Parameter(Mandatory = $false, position = 15, HelpMessage='Expand macros in the trigger description')][switch]$ExpandComment,
+        #Раскрытие макросов в имени триггера. Enable=1
+        [Parameter(Mandatory = $false, position = 16, HelpMessage='Expand macros in the name of the trigger')][switch]$ExpandDescription,
+        #Раскрытие функций и макросов в выражении триггера. Enable=1
+        [Parameter(Mandatory = $false, position = 17, HelpMessage='Expand functions and macros in the trigger expression')][switch]$ExpandExpression,
+        
+        #Возврат тегов триггера в свойстве tags.
+        [Parameter(Mandatory = $false, position = 18)][switch]$ExpandTags,
+    
+        #Возврат элементов данных, которые содержатся в выражении триггера, в свойстве items.
+        [Parameter(Mandatory = $false, position = 19)][switch]$ExpandItems,
+        [Parameter(Mandatory = $false, position = 20)][switch]$Legend
+    )
+
+    If($Trigger -eq 'Static'){
+        $getTrigger = @{
+            "jsonrpc" = "2.0";
+            "method"  = "trigger.get";
+            "params"  = @{
+                "output"= "extend";
+                };
+            "auth"    = $TokenApi;
+            "id"      = $TokenId
+        }
+    }
+    If($Trigger -eq 'Prototype'){
+        $getTrigger = @{
+            "jsonrpc" = "2.0";
+            "method"  = "triggerprototype.get";
+            "params"  = @{
+                "output"= "extend";
+                };
+            "auth"    = $TokenApi;
+            "id"      = $TokenId
+        }
+    }
+
+    #Host
+    if($Hostids  ){ $getTrigger.params.add("hostids", $Hostids)}
+    if($HostName ){ $getTrigger.params.add("host", $HostName)}
+    #Groups
+    if($Groupids){ $getTrigger.params.add("groupids", $Groupids)}
+    if($GroupName){ $getTrigger.params.add("group", $GroupName)}
+    #Template
+    if($templateids){ $getTrigger.params.add("templateids", $templateids)}
+    if($inherited){ $getTrigger.params.add("inherited", $inherited)}
+    if($templated){ $getTrigger.params.add("templated", $templated)}
+    if($ExpandTriggerDiscovery){ $getTrigger.params.add("selectTriggerDiscovery", "extend")}
+    #Trigers
+    if($monitored){ $getTrigger.params.add("monitored", 1)}
+    if($active){ $getTrigger.params.add("active", 1)}
+    if($only_true){ $getTrigger.params.add("only_true", 1)}
+    #Macros
+    if($expandComment){ $getTrigger.params.add("expandComment", 1)}
+    if($expandDescription){ $getTrigger.params.add("expandDescription", 1)}
+    if($expandExpression){ $getTrigger.params.add("expandExpression", 1)}
+    #Tag
+    if($ExpandTags){ $getTrigger.params.add("selectTags", "extend")}
+    #Items
+    if($ExpandItems){ $getTrigger.params.add("selectItems", "extend")}
+
+    if($Legend){
+        Write-Host '#LEGEND                                                                       ' -BackgroundColor Green
+        Write-Host '#Status  : 0-Enable        1-Disable                                          ' -BackgroundColor Green
+        Write-Host '#Value   : 0-Ok            1-Problem                                          ' -BackgroundColor Green
+        Write-Host '#Priority: 0-notClassified 1-information 2-warning 3-average 4-high 5-disaster' -BackgroundColor Green
+        }
+
+    $json = (ConvertTo-Json -InputObject $getTrigger) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
 
 #########################################
@@ -1331,9 +2048,10 @@ function Get-GraphZabbixAPI {
     } 
     $json = (ConvertTo-Json -InputObject $getGraph) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
-    return $res.result
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
 }
-
 #Connect and Autorization to Zabbix WEB.
 function Connect-ZabbixWEB {
     <#
@@ -1348,7 +2066,7 @@ function Connect-ZabbixWEB {
         Enter the password. If you do not specify a password, the system will ask you to enter it.
     .EXAMPLE
         Connect-ZabbixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -User UserAdmin
-        Connect-ZabbixAPI -UrlWeb 'http://IP_or_FQDN/zabbix' -User UserAdmin -inPasswd "Passw0rd"
+        Connect-ZabbixWEB -UrlWeb 'http://IP_or_FQDN/zabbix' -User UserAdmin -inPasswd "Passw0rd"
     #>
     param(
         [Parameter(Mandatory = $true, position = 0)][string]$UrlWeb,
@@ -1369,10 +2087,9 @@ function Connect-ZabbixWEB {
         password = $str;
         enter    = "Enter"
     }
-    $invokeWebReq =  Invoke-WebRequest -Method Post -Uri ($UrlWeb + "/index.php?login=1") -Body $loginPostData -SessionVariable zabbixSession -UserAgent Chrome
+    $invokeWebReq = Invoke-WebRequest -Method Post -Uri ($UrlWeb + "/index.php?login=1") -Body $loginPostData -SessionVariable zabbixSession -UserAgent Chrome
     return $zabbixSession
 }
-
 #Save the graph as a PNG file.
 function Save-GraphZabixWEB {
     <#
@@ -1433,15 +2150,224 @@ function Save-GraphZabixWEB {
     }
     Invoke-WebRequest -Method Post -Uri $imgUrlJoin -WebSession $WebSession -UserAgent Chrome -OutFile $imgSave
 }
+#########################################
+#Work with Action Zabbix API.
+function Get-ActionZabbixAPI {
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        #Вернуть только действия с заданными идентификаторами
+        [Parameter(Mandatory = $false, position = 3)][int]$Actionids,
+        #Вернуть только действия, использующие в своих условиях заданные группы узлов сети
+        [Parameter(Mandatory = $false, position = 4)][int]$Hostids,
+        #Вернуть только действия, использующие в своих условиях указанные узлы сети
+        [Parameter(Mandatory = $false, position = 5)][int]$Groupids,
+        #Вернуть только действия, использующие в своих условиях данные триггеры
+        [Parameter(Mandatory = $false, position = 6)][int]$Triggerids,
 
+        #Вернуть только действия, использующие данные способы оповещения для отправки сообщений.
+        [Parameter(Mandatory = $false, position = 7)][int]$Mediatypeids,
+        #Вернуть только действия, настроенные на отправку сообщений указанным группам пользователей.
+        [Parameter(Mandatory = $false, position = 8)][int]$Usrgrpids,
+        #Вернуть только действия, настроенные на отправку сообщений указанным пользователям.
+        [Parameter(Mandatory = $false, position = 9)][int]$Userids,
+        #Вернуть только действия, настроенные для запуска заданных сценариев.
+        [Parameter(Mandatory = $false, position = 10)][int]$Scriptids
+
+    )
+    $getAction = @{
+        "jsonrpc" = "2.0";
+        "method" = "action.get";
+        "params" = @{
+            "output" = "extend";         
+            "selectOperations" = "extend";
+            "selectRecoveryOperations" = "extend";
+            "selectUpdateOperations" = "extend";
+            "selectFilter" = "extend";
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+
+    if($Actionids ){ $getAction.params.add("actionids" , $Actionids)}
+    if($Hostids   ){ $getAction.params.add("hostids"   , $Hostids)}
+    if($Groupids  ){ $getAction.params.add("groupids"  , $Groupids)}
+    if($Triggerids){ $getAction.params.add("triggerids", $Triggerids)}
+
+    if($mediatypeids){ $getAction.params.add("mediatypeids", $mediatypeids)}
+    if($usrgrpids   ){ $getAction.params.add("usrgrpids"   , $usrgrpids)}
+    if($userids     ){ $getAction.params.add("userids"     , $userids)}
+    if($scriptids   ){ $getAction.params.add("scriptids"   , $scriptids)}
+
+
+    $json = (ConvertTo-Json -InputObject $getAction) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
+}
+
+#########################################
+#########################################
+#Working with hosts interface Zabbix API.
+#Host Interface Zabbix API.
+function Get-HostInterfaceZabbixAPI{
+    <#
+    .Example
+        #Return all host interface used..
+        Get-HostInterfaceZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2
+    .Example
+        #Return only host interface used by the given hosts..
+        Get-HostInterfaceZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -Search 50023 -SearchObj hostid
+    .Example
+        #Return a hosts property with an array of host that use the interface.
+        Get-HostInterfaceZabbixAPI  -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -Search "host1,host2" -SearchObj dns
+    #>
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $false, position = 3)][int]$Hostid,
+        [Parameter(Mandatory = $false, position = 4)][int]$interfaceid,
+        [Parameter(Mandatory = $false, position = 5)][string]$Search,
+        [Parameter(Mandatory = $false, position = 6)][ValidateSet("hostid", "dns", "ip", "port", "available", "error")]$SearchObj
+    )
+
+    function jsonGetHostInterfaceCore(){
+        $getHost = @{
+            "jsonrpc" = "2.0";
+            "method"  = "hostinterface.get";
+            "params"  = @{
+                "output"       = "extend"
+            };
+            "auth"    = $TokenApi;
+            "id"      = $TokenId;
+        }
+        return $getHost
+    }
+
+    function InvokeRestMethod_HostInterface($InputObject){
+        $json = (ConvertTo-Json -InputObject $InputObject) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+        $res = Invoke-RestMethod -Method 'Post' -Uri $UrlApi -Body $json -ContentType "application/json;charset=UTF-8"
+        return $res
+    }
+
+    #Output SearchObj.
+    if ($search) {
+        $arrSearchHS = @()
+        foreach ( $oneSearchHS in ($Search -split ",") ) {
+            $filterSearchName = @{ $SearchObj = @($oneSearchHS)}
+            $getHostSearch = jsonGetHostInterfaceCore
+            $getHostSearch.params.Add("search", $filterSearchName)
+            $res = InvokeRestMethod_HostInterface($getHostSearch)
+            $arrSearchHS += $res.result
+        } 
+        return $arrSearchHS
+    }
+    #Output All interface
+    else{
+        $getHostSearch = jsonGetHostInterfaceCore
+        if ($Hostid){ $getHostSearch.params.Add("hostids",$Hostid) }
+        if ($interfaceid){ $getHostSearch.params.Add("interfaceids", $interfaceid) }
+        $res = InvokeRestMethod_HostInterface($getHostSearch)
+        return $res.result
+    }
+}
+#Host update Interface Zabbix API.
+function Set-HostInterfaceZabbixAPI{
+
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        [Parameter(Mandatory = $true, position = 3)][int]$InterfaceId,
+
+        [Parameter(Mandatory = $false, position = 4)][string]$DNS,
+        [Parameter(Mandatory = $false, position = 5)][string]$IP,
+        [Parameter(Mandatory = $false, position = 6)][int]$Port,
+        #Possible values: 1 - Zabbix agent; 2 - SNMP; 3 - IPMI; 4 - JMX.
+        [Parameter(Mandatory = $false, position = 7)][ValidateSet("1-Agent","2-SNMP","3-IPMI","4-JMX")]$Type,
+        #Possible values: 0-Defaut; 1- NotDefault.
+        [Parameter(Mandatory = $false, position = 8)][ValidateSet("0-Default","1-NotDefault")]$Main,
+        #Possible values: 0 - use DNS; 1 - use IP
+        [Parameter(Mandatory = $false, position = 9)][ValidateSet("0-DNS use","1-IP use")]$UseIP,
+        #Possible values: 1 - SNMPv1; 2 - SNMPv2c; 3 - SNMPv3.
+        [Parameter(Mandatory = $false, position = 10)][ValidateSet("1-SNMPv1","2-SNMPv2c","3-SNMPv3")]$SNMP_Version,
+        [Parameter(Mandatory = $false, position = 11)][string]$Contextname,
+        [Parameter(Mandatory = $false, position = 12)][string]$Community,
+        [Parameter(Mandatory = $false, position = 13)][string]$SecurityName,
+        #Possible values are: 0 - noAuthNoPriv; 1 - authNoPriv; 2 - authPriv.
+        [Parameter(Mandatory = $false, position = 14)][ValidateSet("0-noAuthNoPriv","1-authNoPriv","2-authPriv")]$Securitylevel,
+        #Possible values are: 0 - MD5; 1 - SHA1; 2 - SHA224; 3 - SHA256; 4 - SHA384; 5 - SHA512.
+        [Parameter(Mandatory = $false, position = 15)][ValidateSet("0-MD5","1-SHA1","2-SHA224","3-SHA256","4-SHA384","5-SHA512")]$Authprotocol,
+        [Parameter(Mandatory = $false, position = 16)][string]$Authpassphrase,
+        #Possible values are: 0 - DES; 1 - AES128; 2 - AES192; 3 - AES256; 4 - AES192C; 5 - AES256C.
+        [Parameter(Mandatory = $false, position = 17)][ValidateSet("0-DES","1-AES128","2-AES192","3-AES256","4-AES192C","5-AES256C")]$Privprotocol,
+        [Parameter(Mandatory = $false, position = 18)][string]$Privpassphrase,
+        #Possible values: 0 - don't use bulk requests; 1 - (default) - use bulk requests.
+        [Parameter(Mandatory = $false, position = 19)][ValidateSet("0-not builk requests","1-builk requests")]$Bulk
+    )
+
+    function jsonSetHostInterfaceCore(){
+        $HostInterfaceUpdate = @{
+            "jsonrpc" = "2.0";
+            "method"  = "hostinterface.update";
+            "params"  = @{
+                "output"       = "extend"
+                "details"      = @{}
+            };
+            "auth"    = $TokenApi;
+            "id"      = $TokenId;
+        }
+        return $HostInterfaceUpdate
+    }
+    <#
+    $arrInterfaceId = @()
+    foreach ( $oneInterfaceId in ($InterfaceId -split ",") ){
+       $arrInterfaceId += ('"'+ $oneInterfaceId +'"')
+    }
+    $allInterfaceId = $arrInterfaceId -join ","
+    #>
+    $setHostInterface = jsonSetHostInterfaceCore
+
+    $setHostInterface.params.Add("interfaceid", $InterfaceId ) 
+    if($DNS)            { $setHostInterface.params.Add("dns", $DNS ) }
+    if($IP)             { $setHostInterface.params.Add("ip", $IP ) }
+    if($Port)           { $setHostInterface.params.Add("Port", $Port ) }
+    if($Contextname)    { $setHostInterface.params.details.Add("contextname", $Contextname ) }
+    if($Community)      { $setHostInterface.params.details.Add("community", $Community ) }
+    if($SecurityName)   { $setHostInterface.params.details.Add("securityname", $SecurityName ) }
+    if($Authpassphrase) { $setHostInterface.params.details.Add("authpassphrase", $Authpassphrase ) }
+    if($Privpassphrase) { $setHostInterface.params.details.Add("privpassphrase", $Privpassphrase ) }
+    if($Type)           { $setHostInterface.params.Add("type", $($Type -split "-")[0] ) }
+    if($Main)           { $setHostInterface.params.Add("main", $($Main -split "-")[0] ) }
+    if($UseIP)          { $setHostInterface.params.Add("useip", $($UseIP -split "-")[0] ) }
+    if($SNMP_Version)   { $setHostInterface.params.details.Add("version", $($SNMP_Version -split "-")[0] ) }
+    if($Bulk)           { $setHostInterface.params.details.Add("bulk", $($Bulk -split "-")[0] ) }
+    if($Securitylevel)  { $setHostInterface.params.details.Add("securitylevel", $($Securitylevel -split "-")[0] ) }
+    if($Authprotocol)   { $setHostInterface.params.details.Add("authprotocol", $($Authprotocol -split "-")[0] ) }
+    if($Privprotocol)   { $setHostInterface.params.details.Add("privprotocol", $($Privprotocol -split "-")[0] ) }
+
+    $json = (ConvertTo-Json -InputObject $setHostInterface) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
+    $res = Invoke-RestMethod -Method 'Post' -Uri $UrlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
+}
+
+#########################################
 Export-ModuleMember -Function Connect-ZabbixAPI, `
 Get-HostGroupsZabbixAPI, `
+Set-HostGroupsZabbixAPI, `
 Get-HostsZabbixAPI, `
 New-HostZabbixAPI, `
 Remove-HostsZabbixAPI, `
+#Massdd-HostsZabbixAPI
 Get-TemplateZabbixAPI, `
 Get-UserGroupZabbixAPI, `
 New-UserGroupZabbixAPI, `
+Set-UserGroupZabbixAPI, `
 Get-UserZabbixAPI, `
 New-UserZabbixAPI, `
 Remove-UserZabbixAPI, `
@@ -1449,11 +2375,15 @@ Set-UserZabbixAPI, `
 Get-UserRoleZabbixAPI, `
 Get-MaintenanceZabbixAPI, `
 New-MaintenanceZabbixAPI, `
-Update-MaintenanceZabbixAPI, `
+Set-MaintenanceZabbixAPI, `
 Remove-MaintenanceZabbixAPI, `
 #New-ItemZabbixAPI, `
 Get-ItemZabbixAPI, `
-#New-triggerZabbixAPI, `
-Get-graphZabbixAPI, `
+#New-TriggerZabbixAPI, `
+Get-TriggerZabbixAPI, `
+Get-GraphZabbixAPI, `
 Connect-ZabbixWEB, `
-Save-GraphZabixWEB
+Save-GraphZabixWEB, `
+Get-ActionZabbixAPI, `
+Get-HostInterfaceZabbixAPI, `
+Set-HostInterfaceZabbixAPI
