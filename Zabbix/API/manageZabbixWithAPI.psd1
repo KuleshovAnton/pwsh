@@ -12,7 +12,7 @@
 RootModule = '.\manageZabbixWithAPI.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.0.0.8'
+ModuleVersion = '1.0.0.17'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -129,4 +129,3 @@ PrivateData = @{
 # DefaultCommandPrefix = ''
 
 }
-
