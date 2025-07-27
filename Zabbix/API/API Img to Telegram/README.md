@@ -15,6 +15,8 @@ Name: Img to telegram
 Type: Zabbix agent
 Key : ImgToTelegram["{$ZBXURLWWW}","{$ZBXUSER}","{$ZBXINPASSWD}","{$ZBXGRAPHID}","{$TGMTOKEN}","{$TGMCHATID}"]
 Type of information: Numeric
+Update interval: 0
+Custom intervals: interval 3h, Period 1-7,09:00-18:00
 Tags: Telegram
 
 
