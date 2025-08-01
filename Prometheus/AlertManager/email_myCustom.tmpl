@@ -1,8 +1,7 @@
 {{ define "email.custom_1.subject" }}
-[{{ .Status | toUpper }}{{ if eq .Status "firing" }}{{ "\U0001F525" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.SortedPairs.Values | join " " }} {{ if gt (len .CommonLabels.alertname) (len .GroupLabels.alertname) }}({{ with .CommonLabels.Remove .GroupLabels.Names }}{{ .Values | join " " }}{{ end }})
+[{{ if eq .Status "firing" }} {{ "\U0001F525" }}{{ "FIRING" }}:{{ .Alerts.Firing | len }} {{ else }}{{ "💧RESOLVED" }}{{ end }}] {{ .GroupLabels.SortedPairs.Values | join " " }} {{ if gt (len .CommonLabels.alertname) (len .GroupLabels.alertname) }}({{ with .CommonLabels.Remove .GroupLabels.Names }}{{ .Values | join " " }}{{ end }})
 {{ end }}
 {{ end }}
-
 
 {{ define "email.custom_1.body.html" }}
 <!--
