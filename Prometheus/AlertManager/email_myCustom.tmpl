@@ -1,6 +1,5 @@
 {{ define "email.custom_1.subject" }}
-[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}]
-{{ .GroupLabels.SortedPairs.Values | join " " }} {{ if gt (len .CommonLabels) (len .GroupLabels) }}({{ with .CommonLabels.Remove .GroupLabels.Names }}{{ .Values | join " " }}{{ end }})
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}{{ "\U0001F525" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.SortedPairs.Values | join " " }} {{ if gt (len .CommonLabels.alertname) (len .GroupLabels.alertname) }}({{ with .CommonLabels.Remove .GroupLabels.Names }}{{ .Values | join " " }}{{ end }})
 {{ end }}
 {{ end }}
 
@@ -101,13 +100,10 @@ h4 {
                 {{ range .Alerts.Firing }}
                 <tr style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
                   <td class="content-block" style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; padding: 0 0 20px;" valign="top">
-                    <strong style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
-						Labels
-					</strong><br />
 					<strong>Source Host:</strong> {{ .Labels.instance }}<br />
 					<strong>Severity:</strong> {{ .Labels.severity }}<br />
 					<strong>Time problem started:</strong> {{ .StartsAt }}<br />
-					<strong>AccountId:</strong> {{ .Labels.accountID }}<br />
+					<!-- <strong>AccountId:</strong> {{ .Labels.accountID }}<br /> -->
 					<strong>Description:</strong> {{ .Annotations.description }}<br />
                     <a href="{{ .GeneratorURL }}" style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px; color: #348eda; text-decoration: underline;">
 						Source
@@ -138,13 +134,10 @@ h4 {
                 {{ range .Alerts.Resolved }}
                 <tr style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
                   <td class="content-block" style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px; vertical-align: top; padding: 0 0 20px;" valign="top">
-                    <strong style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px;">
-						Labels
-					</strong><br />
 					<strong>Source Host:</strong> {{ .Labels.instance }}<br />
 					<strong>Severity:</strong> {{ .Labels.severity }}<br />
 					<strong>Time problem end:</strong> {{ .EndsAt }}<br />
-					<strong>AccountId:</strong> {{ .Labels.accountID }}<br />
+					<!-- <strong>AccountId:</strong> {{ .Labels.accountID }}<br /> -->
 					<strong>Description:</strong> {{ .Annotations.description }}<br />
                     <a href="{{ .GeneratorURL }}" style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; box-sizing: border-box; font-size: 14px; color: #348eda; text-decoration: underline;">
 						Source
