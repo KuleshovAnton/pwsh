@@ -65,29 +65,31 @@ $rawUrl = ($context.Request.RawUrl) -split "/"
 $chatId= $rawUrl[2]
 function msgToChatIVA {
     param(
-        [string]$userAuth,
-        [string]$passAuth,
-        [string]$urlAuth,
-        [string]$chatId,
-        [string]$chatUrl,
-        $msg
+        [Parameter(Mandatory=$true,Position=0)][string]$userAuth,
+        [Parameter(Mandatory=$true,Position=1)][string]$passAuth,
+        [Parameter(Mandatory=$true,Position=2)][string]$urlAuth,
+        [Parameter(Mandatory=$true,Position=3)][string]$chatId,
+        [Parameter(Mandatory=$true,Position=4)][string]$chatUrl,
+        [Parameter(Mandatory=$true,Position=5)]$msg
     )
-    $apiChatIVA = ($chatUrl +"/api/rest/chats/"+ $chatId +"/send-message")
+    #url auth
     $authBody = @{"login"=$userAuth; "password"=$passAuth; "rememberMe"="false"}
     $authReq = @{
-        body = $authBody | ConvertTo-Json
-        uri  = $urlAuth
+        body = ($authBody | ConvertTo-Json)
+        uri  = ($urlAuth +"/api/rest/login")
         headers = @{"content-type" = "application/json"}
         method = "Post"
     }
     $resp = (Invoke-WebRequest @authReq | ConvertFrom-Json).sessionid
 
+    #url cahat
+    $apiChatIVA = ($chatUrl +"/api/rest/chats/"+ $chatId +"/send-message")
+    #send msg to cahat
     $sendHeaders = @{"Session"=$resp; "Content-type" = "application/json"; "Local"="RU"}
     $sendBody1 = @{"message"=$msg} | ConvertTo-Json
     $sendBody2 = [System.Text.Encoding]::UTF8.GetBytes($sendBody1)
     Invoke-RestMethod -Method Post -Uri $apiChatIVA -Body $sendBody2 -Headers $sendHeaders
 }
-
 
 ######################################################################################
 #Create systemd services.
@@ -103,6 +105,22 @@ ExecStart=/usr/local/bin/alertmanager_webhook.ps1
 [Install]
 WantedBy=multi-user.target
 
+######################################################################################
+#msg example:
+Receiver    : team-124
+Status      : 🔥firing
+
+AlertName   : NodeExporter-Down
+Instance    : 127.0.0.1:9100
+StartsAt    : 08/08/2025 15:40:00
+Summary     : Node exporter is DOWN
+Description : Grafana discover - node exporter is DOWN
+
+AlertName   : NodeExporter-Down
+Instance    : 192.168.0.115:9100
+StartsAt    : 08/08/2025 15:40:00
+Summary     : Node exporter is DOWN
+Description : Grafana discover - node exporter is DOWN
 
 ######################################################################################
 <#
