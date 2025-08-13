@@ -18,7 +18,8 @@ while($true){
         #Read incoming body from alertmanager.
         $requestBodyReader = New-Object System.IO.StreamReader $context.Request.InputStream
         $js3 = $requestBodyReader.ReadToEnd() | ConvertFrom-Json
-        #Create new body to msg.
+
+        <#Create new body to msg only firing or resolved.
         if($js3.status -eq 'firing') {
             $firings = $js3.alerts | Where-Object { $_.status -eq "firing"}
         }else{
@@ -44,6 +45,48 @@ while($true){
             )
             $arrFiring += $msg
         }
+        #>
+        #Create new body to msg all message.
+        $arrFiring = @()
+        if($js3.status -eq 'firing') {
+            $firings = $js3.alerts | Where-Object { $_.status -eq "firing" -or $_.status -eq "resolved" }
+            if( $firings.status -eq "firing" ){
+                foreach ( $oneFiring in ($firings | Where-Object {$_.status -eq "firing"}) ){
+                    $msg = ("
+                    🔥AlertName : "+ $oneFiring.labels.alertname +"
+                    Instance    : "+ $oneFiring.labels.instance +"
+                    StartsAt    : "+ $oneFiring.startsAt +"
+                    Summary     : "+ $oneFiring.annotations.summary +"
+                    Description : "+ $oneFiring.annotations.description +"
+                    ")
+                    $arrFiring += $msg
+                }
+            }
+            if( $firings.status -eq "resolved" ){
+                foreach ( $oneFiring in ($firings | Where-Object {$_.status -eq "resolved"}) ){
+                    $msg = ("
+                    💧AlertName : "+ $oneFiring.labels.alertname +"
+                    Instance    : "+ $oneFiring.labels.instance +"
+                    EndsAt      : start "+ $oneFiring.startsAt +" end "+ $oneFiring.endsAt +"
+                    ")
+                    $arrFiring += $msg
+                }
+            }
+        }
+        if($js3.status -eq 'resolved'){
+            $firings = $js3.alerts | Where-Object { $_.status -eq "resolved"}
+            foreach ( $oneFiring in $firings ){
+                $msg = ("
+                AlertName : "+ $oneFiring.labels.alertname +"
+                Instance    : "+ $oneFiring.labels.instance +"
+                EndsAt      : "+ $oneFiring.endsAt +"
+                Summary     : "+ $oneFiring.annotations.summary +"
+                Description : "+ $oneFiring.annotations.description +"
+                ")
+                $arrFiring += $msg
+            }
+        }
+
 		#mark img status.
         if ($js3.status -eq 'firing') { $emg = "🔥"} else { $emg ="💧"}
 		#message for send.
@@ -125,9 +168,10 @@ ExecStart=/usr/local/bin/alertmanager_webhook.ps1
 WantedBy=multi-user.target
 
 ######################################################################################
-#msg example:
+#msg example: 
+#Create new body to msg only firing or resolved.
+🔥FIRING
 Receiver    : team-124
-Status      : 🔥firing
 
 AlertName   : NodeExporter-Down
 Instance    : 127.0.0.1:9100
@@ -140,6 +184,22 @@ Instance    : 192.168.0.115:9100
 StartsAt    : 08/08/2025 15:40:00
 Summary     : Node exporter is DOWN
 Description : Grafana discover - node exporter is DOWN
+
+######################################################################################
+#msg example:
+#Create new body to msg all message.
+🔥FIRING
+Receiver    : team-124
+
+🔥AlertName : NodeExporter-Down
+Instance    : 127.0.0.1:9100
+StartsAt    : 08/07/2025 21:39:00
+Summary     : Instance 127.0.0.1:9100 down
+Description : VMalert - 127.0.0.1:9100 of job=node-exporter-VictoriaMetrics has been down for more than 1 minute.
+
+💧AlertName : NodeExporter-Down
+Instance    : 192.168.0.115:9100
+EndsAt      : start 08/07/2025 21:38:30 end 08/07/2025 21:42:20
 
 ######################################################################################
 <#
