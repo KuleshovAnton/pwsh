@@ -1,10 +1,13 @@
 #!/bin/pwsh
 
-#v_1.0.0.0
+#v_1.0.0.3
 #Accept and send a alertmanager_webhook.
+#Shutdown listener port. Example: #curl http://localhost:8080/api/end
+#Create listener port.
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add('http://localhost:8080/api/')
 $listener.Start()
+
 while($true){
     #Shutdown listener #curl http://localhost:8080/api/end
     if($request.URL -match '/api/end$'){
@@ -23,28 +26,30 @@ while($true){
         }
         $arrFiring = @()
         foreach ( $oneFiring in $firings){
-            $myObjectPath = New-Object System.Object
-            $myObjectPath | Add-Member -Type NoteProperty -Name Alertname -Value $oneFiring.labels.alertname
-            $myObjectPath | Add-Member -Type NoteProperty -Name Instance -Value $oneFiring.labels.instance
-            $myObjectPath | Add-Member -type NoteProperty -Name startsAt -Value $oneFiring.startsAt
-            $myObjectPath | Add-Member -type NoteProperty -Name Summary -Value $oneFiring.annotations.summary
-            $myObjectPath | Add-Member -type NoteProperty -Name Description -Value $oneFiring.annotations.description
-
+			
+			if($oneFiring.status -eq 'firing'){
+				$time = ("StartsAt    : "+ $oneFiring.startsAt)
+			}
+			if($oneFiring.status -eq 'resolved'){
+				$time = ("EndsAt      : "+ $oneFiring.endsAt)
+			}
+			
             $msg = ("
-            AlertName   : "+ $myObjectPath.Alertname +"
-            Instance    : "+ $myObjectPath.instance +"
-            StartsAt    : "+ $myObjectPath.startsAt +"
-            Summary     : "+ $myObjectPath.Summary +"
-            Description : "+ $myObjectPath.Description
+            AlertName   : "+ $oneFiring.labels.alertname +"
+            Instance    : "+ $oneFiring.labels.instance +"
+            "+ $time +"
+            Summary     : "+ $oneFiring.annotations.summary +"
+            Description : "+ $oneFiring.annotations.description +"
+			"
             )
             $arrFiring += $msg
         }
-
+		#mark img status.
         if ($js3.status -eq 'firing') { $emg = "🔥"} else { $emg ="💧"}
-
-        $msgToIva  =("
+		#message for send.
+        $msgToIva  =(
+		$emg +""+ $js3.status.ToUpper() +"
         Receiver    : "+$js3.receiver +"
-        Status      : "+$emg +""+ $js3.status +"
         "+$arrFiring
         )
         ######################################################################################
@@ -62,7 +67,9 @@ $listener.Stop()
 
 #String RawUrl. example /api/2378234gyufyi-pqiuriuwh34-ijdhiuy4wi/
 $rawUrl = ($context.Request.RawUrl) -split "/"
+#output chat ID
 $chatId= $rawUrl[2]
+#Run sendto IVA
 function msgToChatIVA {
     param(
         [Parameter(Mandatory=$true,Position=0)][string]$userAuth,
@@ -79,7 +86,7 @@ function msgToChatIVA {
         uri  = ($urlAuth +"/api/rest/login")
         headers = @{"content-type" = "application/json"}
         method = "Post"
-    }
+        }
     $resp = (Invoke-WebRequest @authReq | ConvertFrom-Json).sessionid
 
     #url cahat
@@ -88,8 +95,20 @@ function msgToChatIVA {
     $sendHeaders = @{"Session"=$resp; "Content-type" = "application/json"; "Local"="RU"}
     $sendBody1 = @{"message"=$msg} | ConvertTo-Json
     $sendBody2 = [System.Text.Encoding]::UTF8.GetBytes($sendBody1)
-    Invoke-RestMethod -Method Post -Uri $apiChatIVA -Body $sendBody2 -Headers $sendHeaders
+	try{
+	    $msgto = Invoke-RestMethod -Method Post -Uri $apiChatIVA -Body $sendBody2 -Headers $sendHeaders
+		[string]$timeAt = ($msgto.createdAt)
+		$timeLength = $timeAt.Substring(0, 10)
+		$timeResult = (([System.DateTimeOffset]::FromUnixTimeSeconds($timeLength)).DateTime.ToLocalTime()).ToString("s")
+		( $timeResult +";Send;chatRoomID<"+ $msgto.chatRoomId +">") | Out-File "/tmp/alertmanager_webhook.log" -Append -Encoding utf8 -ErrorAction Ignore
+	}catch{
+		$StatusCode = $_.Exception.Response.StatusCode
+		#$StatusDescription = $_.Exception.Response.StatusDescription
+		$ErrorMessage = $_.ErrorDetails.Message
+		( $(get-date -Format 'yyyy-MM-ddTHH:mm:ss')+";Error;"+ $([int]$StatusCode) +" "+ $($StatusCode) +" - "+ $($ErrorMessage) ) | Out-File "/tmp/alertmanager_webhook.log" -Append -Encoding utf8 -ErrorAction Ignore
+	}
 }
+msgToChatIVA -userAuth $userAuth -passAuth $userAuthPass -urlAuth $urlVCS -chatUrl $urlVCS -chatId $chatId -msg $msgToIva
 
 ######################################################################################
 #Create systemd services.
