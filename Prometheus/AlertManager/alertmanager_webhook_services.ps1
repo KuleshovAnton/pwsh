@@ -9,12 +9,12 @@ $listener.Prefixes.Add('http://localhost:8080/api/')
 $listener.Start()
 
 while($true){
+    $context = $listener.GetContext()
+    $request = $context.Request
     #Shutdown listener #curl http://localhost:8080/api/end
     if($request.URL -match '/api/end$'){
         break
     }else{
-        $context = $listener.GetContext()
-        $request = $context.Request
         #Read incoming body from alertmanager.
         $requestBodyReader = New-Object System.IO.StreamReader $context.Request.InputStream
         $js3 = $requestBodyReader.ReadToEnd() | ConvertFrom-Json
