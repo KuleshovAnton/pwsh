@@ -9,39 +9,15 @@ $listener.Prefixes.Add('http://localhost:8080/api/')
 $listener.Start()
 
 while($true){
-    $context = $listener.GetContext()
+    $context = $listener.GetContextAsync()
 
     #Shutdown listener #curl http://localhost:8080/api/end
-    if($context.Request.URL -match '/api/end$'){
+    if($context.Result.Request.URL -match '/api/end$'){
         break
     }else{
         #Read incoming body from alertmanager.
-        $requestBodyReader = New-Object System.IO.StreamReader $context.Request.InputStream
+        $requestBodyReader = New-Object System.IO.StreamReader $context.Result.Request.InputStream
         $js3 = $requestBodyReader.ReadToEnd() | ConvertFrom-Json
-
-        <#Create new body to msg only firing or resolved.
-        if($js3.status -eq 'firing') { $firings = $js3.alerts | Where-Object { $_.status -eq "firing"}
-        }else{ $firings = $js3.alerts | Where-Object { $_.status -eq "resolved"} }
-
-        $arrFiring = @()
-        foreach ( $oneFiring in $firings){
-			
-			if($oneFiring.status -eq 'firing'){ 
-                $time = ("StartsAt    : "+ $oneFiring.startsAt) }
-			if($oneFiring.status -eq 'resolved'){ 
-                $time = ("EndsAt      : "+ $oneFiring.endsAt) }
-			
-            $msg = ("
-            AlertName   : "+ $oneFiring.labels.alertname +"
-            Instance    : "+ $oneFiring.labels.instance +"
-            "+ $time +"
-            Summary     : "+ $oneFiring.annotations.summary +"
-            Description : "+ $oneFiring.annotations.description +"
-			"
-            )
-            $arrFiring += $msg
-        }
-        #>
 
         #Create new body to msg all message.
         $arrFiring = @()
@@ -98,7 +74,7 @@ while($true){
         ######################################################################################
         
         #Close session.
-        $context.Response.Close()
+        $context.Result.Response.Close()
     }
 }
 $listener.Stop()
@@ -106,7 +82,7 @@ $listener.Stop()
 ######################################################################################
 
 #String RawUrl. example /api/2378234gyufyi-pqiuriuwh34-ijdhiuy4wi/
-$rawUrl = ($context.Request.RawUrl) -split "/"
+$rawUrl = ($context.Result.Request.RawUrl) -split "/"
 #output chat ID
 $chatId= $rawUrl[2]
 #Run sendto IVA
@@ -199,14 +175,6 @@ Instance    : 192.168.0.115:9100
 EndsAt      : start 08/07/2025 21:38:30 end 08/07/2025 21:42:20
 
 ######################################################################################
-<#
-HasEntityBody:      возвращает true, если в запросе кроме заголовоков переданы какие-нибудь данные (тело запроса).
-HttpMethod:         возвращает метод HTTP, использованный для отправки запроса клиентом.
-IsAuthenticated:    возвращает значение bool, которое указывает, аутентифицирован ли клиент, отправивший этот запрос.
-IsLocal:            возвращает значение bool, которое указывает, был ли запрос отправлен с локального компьютера.
-KeepAlive:          возвращает значение bool, которое указывает, требует ли клиент постоянного подключения.
-RemoteEndPoint:     возвращает IP-адрес клиента, который отправил запрос.
-#>
 
 #Kill
 #curl http://localhost:8080/api/end
