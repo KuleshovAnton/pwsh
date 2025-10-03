@@ -1,0 +1,349 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_POSTGRESQL",
+      "label": "PostgreSQL",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "grafana-postgresql-datasource",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "11.2.10"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-postgresql-datasource",
+      "name": "PostgreSQL",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_POSTGRESQL-PROD}"
+      },
+      "description": "Режим обслуживания:\n100% - Режим обслуживания не активен.\n0% -  Режим обслуживания завершён.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true,
+            "inspect": false,
+            "width": 170
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#EAB839",
+                "value": 40
+              },
+              {
+                "color": "red",
+                "value": 70
+              },
+              {
+                "color": "dark-red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "period"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.align",
+                "value": "center"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Remained %"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "gauge"
+                }
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "custom.width",
+                "value": 272
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "name"
+            },
+            "properties": [
+              {
+                "id": "custom.width"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "description"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 513
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "json-view"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "start_date"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "light-blue",
+                      "value": null
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "end_date"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "light-yellow",
+                      "value": null
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 37,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": false,
+            "displayName": "Remained %"
+          }
+        ]
+      },
+      "pluginVersion": "11.2.10",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_POSTGRESQL-PROD}"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "Select --M.maintenanceid,\r\nCASE\r\nWHEN\r\n--Если результат значения более 100, представляем значение как 100%\r\n(\r\n    (\r\n        EXTRACT(month FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))*43200 +\r\n        EXTRACT(day FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))*1140 +      \r\n        EXTRACT(hour FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))*60 +\r\n        EXTRACT(minutes FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))\r\n    ) /\r\n    (TP.period / 60)\r\n)*100 > 100 THEN '100'\r\nELSE\r\n--Если результат значения менее или равно 100, оставляем как есть.\r\n(\r\n    (\r\n        EXTRACT(month FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))*43200 +\r\n        EXTRACT(day FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))*1140 +      \r\n        EXTRACT(hour FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))*60 +\r\n        EXTRACT(minutes FROM date_trunc('second', age(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK')))\r\n    ) /\r\n    (TP.period / 60)\r\n)*100\r\nEND as \"Remained %\",\r\nM.name, \r\nM.description,\r\nTP.period,\r\nto_timestamp(TP.start_date) at time zone 'MSK' as \"start_date\",\r\nto_timestamp(TP.start_date + TP.period) at time zone 'MSK' as \"end_date\",\r\nage(to_timestamp(TP.start_date + TP.period) at time zone 'MSK', now() at time zone 'MSK') as \"Remained\"\r\n    From maintenances M\r\n    left join maintenances_windows MW on M.maintenanceid = MW.maintenanceid\r\n    left join timeperiods TP on MW.timeperiodid = TP.timeperiodid\r\n    Where \r\n    --Выбираем если не более 2-х недель (указывается в секундах 1209600)\r\n    TP.period < 5184000\r\n    --Выбираем дату окончания задания + 600 секунд (для показа на дашборде)\r\n    AND ( now() at time zone 'MSK' < to_timestamp(TP.start_date + TP.period + 600) at time zone 'MSK' )\r\n    --Выбираем за какой период необходимо производить выборку начала запуска ПГ, расчитываем количество дней между стартом ПГ и текущем временем, результат дней < 14 дней\r\n    AND date_part('day', (age(to_timestamp(TP.start_date), now() at time zone 'MSK' ))) < 14\r\n    --Выбираем за какой период необходимо производить выборку начала запуска ПГ, расчитываем количество месяцев между стартом ПГ и текущем временем, результат месяцев < 1 месяц\r\n    AND date_part('month', (age(to_timestamp(TP.start_date), now() at time zone 'MSK' ))) < 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "timeColumn": "time",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Maintenance periods",
+      "transformations": [
+        {
+          "id": "spatial",
+          "options": {
+            "action": "modify"
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "5m",
+  "revision": 1,
+  "schemaVersion": 39,
+  "tags": [
+    "PM"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5m",
+      "15m",
+      "30m"
+    ]
+  },
+  "timezone": "utc",
+  "title": "Maintenance periods",
+  "uid": "MvZBz9mIk",
+  "version": 19,
+  "weekStart": ""
+}
