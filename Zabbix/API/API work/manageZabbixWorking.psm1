@@ -1,6 +1,9 @@
 #!/bin/pwsh
 
-#Version 1.0.0.2
+#Version 1.0.0.4
+
+##################################################################################
+#Used Monitoring.
 function Get-HostUsedMonitoring{
     <#
     .SYNOPSIS
@@ -49,7 +52,7 @@ function Get-HostUsedMonitoring{
         $objHosts | Add-Member -Type NoteProperty -Name error -Value $searchInterface.error
         $searchHostArr += $objHosts
     }
-    Write-Host "--Object beging monitored in Zabbix." -ForegroundColor Green
+    Write-Host "--Object beging monitored in Zabbix. Total: $($searchHostArr.Count) " -ForegroundColor Green
     $searchHostArr | Sort-Object host | Format-Table
 
     #Сравниваем объекты из массива список хостов для поиска "$arrрHosts" и найденых объектов на мониторинге в Zabbix "$searchHost"
@@ -63,6 +66,99 @@ function Get-HostUsedMonitoring{
         $compareHostf
         }
 }
+##################################################################################
+#Export Template\Host item and trigger configuration.
+function Export-TemplateHostZabbix {
+    param(
+        [Parameter(Mandatory=$true,position=1)][Alias('UrlApi')][string]$apiUrl,
+        [Parameter(Mandatory=$true,position=2)][Alias('TokenApi')][string]$apiTokenResult,
+        [Parameter(Mandatory=$true,position=3)][Alias('TokenId')][int]$apiTokenId,
+        [Parameter(Mandatory=$true,position=4)][int]$ID,
+        [Parameter(Mandatory=$true,position=5)][ValidateSet('Template','Host')]$Object,
+        [Parameter(Mandatory=$true,position=6)][string]$exportCsvPatch
+    )
+    #Item Template
+    if($Object -eq 'Template'){
+        $item     = Get-ItemZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -Item Static -Templateids $ID -Hosts 0
+        $itemProt = Get-ItemZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -Item Prototype -Templateids $ID -Hosts 0
 
-#########################################
-Export-ModuleMember -Function Get-HostUsedMonitoring
+    }
+    #Item Host
+    if($Object -eq 'Host'){
+        $item     = Get-ItemZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -Item Static -Hosts $ID
+        $itemProt = Get-ItemZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -Item Prototype -Hosts $ID
+    }
+    #Trigger Template\Host
+    $trigger = Get-TriggerZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -Trigger Static -Templateids $ID -ExpandComment -ExpandDescription -ExpandItems -ExpandExpression | `
+    Select-Object triggerid, @{n="itemid";e={$_.Items.itemid}}, expression, recovery_expression, description, priority, status, comments
+    $triggerProt = Get-TriggerZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -Trigger Prototype -Templateids $ID -ExpandComment -ExpandDescription -ExpandItems -ExpandExpression | `
+    Select-Object triggerid, @{n="itemid";e={$_.Items.itemid}}, expression, recovery_expression, description, priority, status, comments
+
+    #Item join
+    $itemStat = @()
+    $itemStat += $item
+    $itemStat += $itemProt
+    #Trigger join
+    $triggerStat = @()
+    $triggerStat += $trigger
+    $triggerStat += $triggerProt
+
+    #Build Item
+    $arrItem = @()
+    foreach ( $itemOne in $triggerStat ){
+
+        #priority Not classified Information Warning Average High Disaster
+        switch($itemOne.priority){
+            0 { $priority = 'Not classified'}
+            1 { $priority = 'Information'}
+            2 { $priority = 'Warning'}
+            3 { $priority = 'Average'}
+            4 { $priority = 'High'}
+            5 { $priority = 'Disaster'}
+        }
+
+        #status Enable Disable
+        switch($itemOne.status){
+            0 { $statusT = 'Enable'}
+            1 { $statusT = 'Disabled'}
+        }
+
+        $objItem = New-Object System.Object
+        $objItem | Add-Member -Type NoteProperty -Name triggerid -Value $itemOne.triggerid
+        $objItem | Add-Member -Type NoteProperty -Name expression -Value $itemOne.expression
+        $objItem | Add-Member -Type NoteProperty -Name recovery_expression -Value $itemOne.'recovery_expression'
+        $objItem | Add-Member -Type NoteProperty -Name description -Value $itemOne.description
+        $objItem | Add-Member -Type NoteProperty -Name priority -Value $priority
+        $objItem | Add-Member -Type NoteProperty -Name status -Value $statusT
+        $objItem | Add-Member -Type NoteProperty -Name comments -Value $itemOne.comments
+ 
+        $findItem = $itemStat | Where-Object { $_.itemid -eq $itemOne.itemid }
+        $objItem | Add-Member -Type NoteProperty -Name itemid -Value $findItem.itemid
+        $objItem | Add-Member -Type NoteProperty -Name type -Value $findItem.type
+        $objItem | Add-Member -Type NoteProperty -Name name -Value $findItem.name
+        $objItem | Add-Member -Type NoteProperty -Name key_ -Value $findItem.'key_'
+        $objItem | Add-Member -Type NoteProperty -Name delay -Value $findItem.delay
+        $objItem | Add-Member -Type NoteProperty -Name istatus -Value $findItem.status
+        $objItem | Add-Member -Type NoteProperty -Name idescription -Value $findItem.description
+        $objItem | Add-Member -Type NoteProperty -Name master_itemid -Value $findItem.'master_itemid'
+
+        $arrItem += $objItem
+    }
+    $arrItemStat = $itemStat | Where-Object { $_.itemid -notin $arrItem.itemid } | Select-Object `
+    @{n="triggerid";e={$null}}, `
+    @{n="expression";e={$null}}, `
+    @{n="recovery_expression";e={$null}}, `
+    @{n="description";e={$null}}, `
+    @{n="priority";e={$null}}, `
+    @{n="status";e={$null}}, `
+    @{n="comments";e={$null}}, `
+    itemid, type, name, key_, delay, @{n="istatus";e={$_.status}}, @{n="idescription";e={$_.description}}, master_itemid
+
+    $itemStatJoin = $arrItem + $arrItemStat
+    $itemStatJoinCSV = $itemStatJoin | Select-Object itemid, type, name, key_, delay, istatus, idescription, master_itemid, triggerid, description, priority, status, expression, recovery_expression, comments 
+    $itemStatJoinCSV | Export-Csv -Path $exportCsvPatch -Encoding UTF8 -Delimiter ';'
+}
+
+##################################################################################
+Export-ModuleMember -Function Get-HostUsedMonitoring, `
+Export-TemplateHostZabbix
