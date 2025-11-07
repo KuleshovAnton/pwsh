@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.17
+#Version 1.0.0.18
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -1483,7 +1483,7 @@ function New-MaintenanceZabbixAPI {
                 "start_date"      = $periodStartDate  
             }
             
-            $jsonPeriods = (ConvertTo-Json -InputObject $periods) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"{', '{' -replace '}"', '}'
+            $jsonPeriods = (ConvertTo-Json -InputObject $periods -Depth 10 -Compress) -replace '\\"','"' -replace '"\[', '[' -replace '\]"', ']' -replace '"{', '{' -replace '}"', '}'
             $createMaintenance.params.Add("timeperiods", @($jsonPeriods))
         }
 
@@ -1518,7 +1518,7 @@ function New-MaintenanceZabbixAPI {
             $createMaintenance.params.Add("description", $Description)
         }
 
-        $json = (ConvertTo-Json -InputObject $createMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"{', '{' -replace '}"', '}'
+        $json = (ConvertTo-Json -InputObject $createMaintenance -Depth 10 -Compress) -replace '\\"','"' -replace '"\[', '[' -replace '\]"', ']' -replace '"{', '{' -replace '}"', '}' -replace '\\r'
         If($WhatIf -eq $true){
             return $json
         }else{
@@ -1528,7 +1528,7 @@ function New-MaintenanceZabbixAPI {
             }else{ return $res.result }
         }
 }
-#Set Maintenance Zabbix API _v3
+#Set Maintenance Zabbix API _v4
 function Set-MaintenanceZabbixAPI {
     <#
     .SYNOPSIS
@@ -1657,14 +1657,25 @@ function Set-MaintenanceZabbixAPI {
     }
     #If all variables are present $timeperiod_type , $Start_date , $Period , $PeriodJSON 
     if ($timeperiod_type -match '\w' -and $Start_date -match '\w' -and $Period -match '\w' -and $PeriodJSON -match '\w') { 
-       [array]$arrPeriodJSON = $PeriodJSON | ConvertFrom-Json
-       $arrPeriodManual = (manualPeriods -timeperiod_type $timeperiod_type -Start_date $Start_date -Period $Period) | ConvertTo-Json | ConvertFrom-Json
-       $arrPeriodsJoin = $arrPeriodJSON + $arrPeriodManual
-       $resultPeriods = $arrPeriodsJoin | ConvertTo-Json
+       [array]$arrPeriodJSON = ($PeriodJSON | ConvertFrom-Json) | Select-Object timeperiod_type, period, start_date
+       $arrPeriodManual_ = (manualPeriods -timeperiod_type $timeperiod_type -Start_date $Start_date -Period $Period) | ConvertTo-Json | ConvertFrom-Json
+       $arrPeriodManual = $arrPeriodManual_ | Select-Object timeperiod_type, period, start_date
+
+       $arrPeriodsJoin = @()
+       $arrPeriodsJoin += $arrPeriodJSON 
+       $arrPeriodsJoin += $arrPeriodManual
+
+       #Build JSON
+       $arrBuildJson = @()
+       foreach( $onePeriodsJoin in $arrPeriodsJoin){
+            $buildJson = ('{"timeperiod_type":"'+ $onePeriodsJoin.timeperiod_type +'","period":"'+ $onePeriodsJoin.period +'","start_date":"'+ $onePeriodsJoin.start_date +'"}')
+            $arrBuildJson += $buildJson
+       }
+       $resultPeriods = ($arrBuildJson -join ',')
     }
     $updateMaintenance.params.Add("timeperiods",@($resultPeriods))
     
-    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"{','{' -replace '}"','}'
+    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace '\\r\\n' -replace '\\' -replace '\s\s+' -replace '"\[', '[' -replace '\]"', ']' -replace '"{','{' -replace '}"','}'
     If($WhatIf -eq $true){
         return $json
     }else{
@@ -1674,6 +1685,7 @@ function Set-MaintenanceZabbixAPI {
         }else{ return $res.result }
     }
 }
+#Remove Maintenance Zabbix AP
 function Remove-MaintenanceZabbixAPI {
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
