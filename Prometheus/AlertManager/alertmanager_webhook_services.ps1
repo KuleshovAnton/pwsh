@@ -1,12 +1,17 @@
 #!/bin/pwsh
 
-#v_1.0.0.3
+#v_1.0.0.4
 #Accept and send a alertmanager_webhook.
 #Shutdown listener port. Example: #curl http://localhost:8080/api/end
+
 #Create listener port.
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add('http://localhost:8080/api/')
 $listener.Start()
+
+#$userAuth = ''
+#$userAuthPass = ''
+#$urlVCS = ''
 
 while($true){
     $context = $listener.GetContext()
