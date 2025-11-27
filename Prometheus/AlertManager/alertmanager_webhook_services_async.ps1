@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#v_1.0.0.3
+#v_1.0.0.4
 #Accept and send a alertmanager_webhook.
 #Shutdown listener port. Example: #curl http://localhost:8080/api/end
 
