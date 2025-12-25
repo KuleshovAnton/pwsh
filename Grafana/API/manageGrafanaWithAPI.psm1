@@ -357,4 +357,89 @@ function Get-GrafHealth {
         }
 }
 
-Export-ModuleMember -Function Get-GrafTeams, Get-GrafTeamMembers, Add-GrafTeamMembers, New-GrafTeam, Get-GrafUsers, Get-GrafUser, Get-GrafUserTeams, Get-GrafFoldersAndDashboards, Get-GrafPermissionsDashboard, Add-GrafPermissionsDashboard, Get-GrafFrontendSettings, Get-GrafHealth
+################################################################################
+#Get Organization
+function Get-GrafOrganization {
+    <#
+    .SYNOPSIS
+        Grafana Function Get Organization all, Id, Name, Users in.
+    .EXAMPLE
+        Get-GrafUser -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -orgAll True
+        Get-GrafUser -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -orgId 7
+    #>
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url,
+        #Get current Organization
+        [parameter(Mandatory=$false,position=3)][ValidateSet("True", "False")]$orgAll,
+        #Get Organization by Id
+        [parameter(Mandatory=$false,position=5)][int]$orgId,
+        #Get Organization by Name
+        [parameter(Mandatory=$false,position=6)][string]$orgName,
+        #Get Users in Organization
+        [parameter(Mandatory=$false,position=7)][int]$usersInOrgId
+        )
+
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+
+    #Get current Organization
+    if($orgAll){$createDatasourceUri = "$Url/api/orgs"}
+    #Get Organization by Id
+    if($orgId){$createDatasourceUri = "$Url/api/orgs/$orgId"}
+    #Get Organization by Name
+    if($orgName){$createDatasourceUri = "$Url/api/orgs/name/$orgName"}
+    #Get Users in Organization
+    if($usersInOrgId){$createDatasourceUri = "$Url/api/orgs/$usersInOrgId/users"}
+
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential 
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters }
+        Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
+        }
+}
+function Set-GrafOrganization {
+        <#
+    .SYNOPSIS
+        Grafana Function Change Organization.
+    .EXAMPLE
+        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -addUserOrgId 3 -addUserI 45 -addUserRole Editor
+    #>
+    param(
+        [parameter(Mandatory=$true,position=0)]$Login,
+        [parameter(Mandatory=$true,position=1)]$Password,
+        [parameter(Mandatory=$true,position=2)]$Url,
+        [parameter(Mandatory=$false,position=3)]$addUserOrgId,
+        [parameter(Mandatory=$false,position=4)]$addUserId,
+        #Admin — управление пользователями, datasource, dashboards. #Editor — создание/редактирование dashboards. #Viewer — только просмотр.
+        [parameter(Mandatory=$false,position=5)][ValidateSet("Admin","Editor","Viewer")]$addUserRole
+        )
+    $credential = Convert-GrafCredential -Login $Login -Password $Password
+    if($addUserOrgId){
+        $createDatasourceUri = "$Url/api/orgs/$addUserOrgId/users/$addUserId"
+        $body = @{
+            "role"= $addUserRole
+        }
+        $bodyJson = (ConvertTo-Json $body -Compress) -replace "\s\s+"
+    }
+    $datasourceParameters = Create-GrafDatasourceParameters -Method "POST" -URI $createDatasourceUri -Credential $credential
+    Switch (GetOS){
+        Win32NT { return Invoke-RestMethod @datasourceParameters -Body $bodyJson }
+        Unix { return Invoke-RestMethod @datasourceParameters -Body $bodyJson -SkipCertificateCheck }
+        }
+}
+
+Export-ModuleMember -Function Get-GrafTeams, `
+Get-GrafTeamMembers, `
+Add-GrafTeamMembers, `
+New-GrafTeam, `
+Get-GrafUsers, `
+Get-GrafUser, `
+Get-GrafUserTeams, `
+Get-GrafFoldersAndDashboards, `
+Get-GrafPermissionsDashboard, `
+Add-GrafPermissionsDashboard, `
+Get-GrafFrontendSettings, `
+Get-GrafHealth, `
+Get-GrafOrganization, `
+Set-GrafOrganization
