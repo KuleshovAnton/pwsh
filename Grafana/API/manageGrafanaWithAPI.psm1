@@ -45,6 +45,7 @@ function Create-GrafDatasourceParameters {
     return $datasourceParameters
 }
 
+################################################################################################################################################################
 ###TEAMS
 #Get all Teams.
 function Get-GrafTeams {
@@ -148,6 +149,7 @@ function New-GrafTeam {
         }
 }
 
+################################################################################################################################################################
 ###USER
 #Get all users.
 function Get-GrafUsers {
@@ -189,12 +191,8 @@ function Get-GrafUser {
         [parameter(Mandatory=$false,position=4)]$userLoginOrEmail
         )
     $credential = Convert-GrafCredential -Login $Login -Password $Password
-    if ( $userId ) {
-        $createDatasourceUri = "$Url/api/users/$userId"
-        }
-    else {
-        $createDatasourceUri = "$Url/api/users/lookup?loginOrEmail=$userLoginOrEmail"
-        }
+    if ( $userId ) {$createDatasourceUri = "$Url/api/users/$userId"}
+    else {$createDatasourceUri = "$Url/api/users/lookup?loginOrEmail=$userLoginOrEmail"}
     $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
     Switch (GetOS){
         Win32NT { return Invoke-RestMethod @datasourceParameters }
@@ -225,6 +223,7 @@ function Get-GrafUserTeams {
         }
 }
 
+################################################################################################################################################################
 ###DASHBOARD
 #Get Folders And Dashboards.
 function Get-GrafFoldersAndDashboards {
@@ -325,6 +324,7 @@ function Add-GrafPermissionsDashboard {
     return $return
 }
 
+################################################################################################################################################################
 #Grontend Settings
 function Get-GrafFrontendSettings {
     param(
@@ -341,6 +341,7 @@ function Get-GrafFrontendSettings {
         }
 }
 
+################################################################################################################################################################
 #Grafana Health
 function Get-GrafHealth {
     param(
@@ -357,7 +358,7 @@ function Get-GrafHealth {
         }
 }
 
-################################################################################
+################################################################################################################################################################
 #Get Organization
 function Get-GrafOrganization {
     <#
@@ -380,7 +381,6 @@ function Get-GrafOrganization {
         #Get Users in Organization
         [parameter(Mandatory=$false,position=7)][int]$usersInOrgId
         )
-
     $credential = Convert-GrafCredential -Login $Login -Password $Password
 
     #Get current Organization
@@ -398,8 +398,10 @@ function Get-GrafOrganization {
         Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
         }
 }
+
+#Set Organization 
 function Set-GrafOrganization {
-        <#
+    <#
     .SYNOPSIS
         Grafana Function Change Organization.
     .EXAMPLE
