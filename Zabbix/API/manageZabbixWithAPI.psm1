@@ -208,6 +208,15 @@ function Set-HostGroupsZabbixAPI {
 #Working with hosts Zabbix API.
 function Get-HostsZabbixAPI {
     <#
+    .SYNOPSIS
+        ...
+        Additional output: Groups, Inventory, Tags, Interfaces, Macros
+    .PARAMETER filterHostName
+        Return only those results that exactly match the given filter.
+    .PARAMETER searchHostName
+        Return results that match the given pattern (case-insensitive).
+    .PARAMETER $filterHostID
+        Return only hosts with the given host IDs.
     .PARAMETER searchWildcardsEnabled
         If set to True, enables the use of "*" as a wildcard character in the search parameter. Example: -searchHostName "Host*" -searchWildcardsEnabled $True
     .PARAMETER searchStart
