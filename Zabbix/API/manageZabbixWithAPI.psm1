@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.18
+#Version 1.0.0.20
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -48,8 +48,7 @@ function Connect-ZabbixAPI {
     return $token
 }
 #########################################
-#Working with hosts and groups Zabbix API.
-#Host Groups Zabbix API.
+#Working with hosts groups Zabbix API.
 function Get-HostGroupsZabbixAPI {
     <#
     .SYNOPSIS
@@ -131,6 +130,7 @@ function Get-HostGroupsZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 function Set-HostGroupsZabbixAPI {
     <#
     .SYNOPSIS
@@ -205,7 +205,7 @@ function Set-HostGroupsZabbixAPI {
     }
 }
 #########################################
-#Host Zabbix API _v2
+#Working with hosts Zabbix API.
 function Get-HostsZabbixAPI {
     <#
     .PARAMETER searchWildcardsEnabled
@@ -328,7 +328,7 @@ function Get-HostsZabbixAPI {
         }else{ return $res.result }
     }
 }
-#New Create Host to Zabbix API _v7
+
 function New-HostZabbixAPI {
     <#
     .SYNOPSIS
@@ -651,6 +651,7 @@ function New-HostZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 function Remove-HostsZabbixAPI {
     <#
     .Example
@@ -706,7 +707,6 @@ function Add-HostsZabbixAPI {
 #>
 
 #########################################
-#Working with Template Zabbix API.
 #Get all Template Zabbix API
 function Get-TemplateZabbixAPI {
     <#
@@ -750,7 +750,7 @@ function Get-TemplateZabbixAPI {
 }
 
 #########################################
-#Working with Groups Users Zabbix API.
+#Working with Users Groups Zabbix API.
 function Get-UserGroupZabbixAPI {
     <#
     .SYNOPSIS
@@ -815,7 +815,7 @@ function Get-UserGroupZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-#New Group Users Zabbix API.
+
 function New-UserGroupZabbixAPI {
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
@@ -847,7 +847,7 @@ function New-UserGroupZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-#Update Group Users Zabbix API.
+
 function Set-UserGroupZabbixAPI {
     <#
     .SYNOPSIS
@@ -1038,6 +1038,7 @@ function Get-UserZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 function New-UserZabbixAPI {
     <#
     .SYNOPSIS
@@ -1099,6 +1100,7 @@ function New-UserZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 function Remove-UserZabbixAPI {
     <#
     .SYNOPSIS
@@ -1135,6 +1137,7 @@ function Remove-UserZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 function Set-UserZabbixAPI {
     <#
     .SYNOPSIS
@@ -1269,6 +1272,7 @@ function Get-UserRoleZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 #########################################
 #Working with Maintenance Zabbix API.
 function Get-MaintenanceZabbixAPI {
@@ -1388,6 +1392,7 @@ function Get-MaintenanceZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 function New-MaintenanceZabbixAPI {
     <#
     .SYNOPSIS
@@ -1528,7 +1533,7 @@ function New-MaintenanceZabbixAPI {
             }else{ return $res.result }
         }
 }
-#Set Maintenance Zabbix API _v4
+
 function Set-MaintenanceZabbixAPI {
     <#
     .SYNOPSIS
@@ -1608,13 +1613,14 @@ function Set-MaintenanceZabbixAPI {
         }
         $updateMaintenance.params.add("maintenance_type", $mType)
     }
-    #Add groupids or hostids
+    #Add groupids
     if ($groupids) {
-        $cGroupids = $groupids -replace "\s"
+        $cGroupids = $groupids -replace "\s" -replace '([^,]+)','"$1"'
         $updateMaintenance.params.Add("groupids", @($cGroupids))
     }
+    #Add hostids
     if ($hostids) {
-        $cHostids = $hostids -replace "\s"
+        $cHostids = $hostids -replace "\s" -replace '([^,]+)','"$1"'
         $updateMaintenance.params.Add("hostids", @($cHostids))
     }
 
@@ -1675,7 +1681,7 @@ function Set-MaintenanceZabbixAPI {
     }
     $updateMaintenance.params.Add("timeperiods",@($resultPeriods))
     
-    $json = (ConvertTo-Json -InputObject $updateMaintenance) -replace '\\r\\n' -replace '\\' -replace '\s\s+' -replace '"\[', '[' -replace '\]"', ']' -replace '"{','{' -replace '}"','}'
+    $json = (ConvertTo-Json -InputObject $updateMaintenance -Compress) -replace '\\r\\n' -replace '\\' -replace '\s\s+' -replace '"\[', '[' -replace '\]"', ']' -replace '"{','{' -replace '}"','}' -replace '""','"'
     If($WhatIf -eq $true){
         return $json
     }else{
@@ -1685,7 +1691,7 @@ function Set-MaintenanceZabbixAPI {
         }else{ return $res.result }
     }
 }
-#Remove Maintenance Zabbix AP
+
 function Remove-MaintenanceZabbixAPI {
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
@@ -1709,6 +1715,7 @@ function Remove-MaintenanceZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 #########################################
 #Working with Item Zabbix API.
 function New-ItemZabbixAPI {
@@ -1768,6 +1775,7 @@ function New-ItemZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
+
 function Get-ItemZabbixAPI {
     <#
     .SYNOPSIS
@@ -1867,6 +1875,7 @@ function Get-ItemZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 #########################################
 #Working with Trigger Zabbix API.
 function New-TriggerZabbixAPI {
@@ -1900,6 +1909,7 @@ function New-TriggerZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
+
 function Get-TriggerZabbixAPI{
     <#
     .SYNOPSIS
@@ -2162,6 +2172,7 @@ function Save-GraphZabixWEB {
     }
     Invoke-WebRequest -Method Post -Uri $imgUrlJoin -WebSession $WebSession -UserAgent Chrome -OutFile $imgSave
 }
+
 #########################################
 #Work with Action Zabbix API.
 function Get-ActionZabbixAPI {
@@ -2221,9 +2232,7 @@ function Get-ActionZabbixAPI {
 }
 
 #########################################
-#########################################
 #Working with hosts interface Zabbix API.
-#Host Interface Zabbix API.
 function Get-HostInterfaceZabbixAPI{
     <#
     .Example
@@ -2286,6 +2295,7 @@ function Get-HostInterfaceZabbixAPI{
         return $res.result
     }
 }
+
 #Host update Interface Zabbix API.
 function Set-HostInterfaceZabbixAPI{
 
@@ -2369,6 +2379,91 @@ function Set-HostInterfaceZabbixAPI{
 }
 
 #########################################
+#Working withMedia type Zabbix API.
+function Get-MediaTypeZabbixAPI {
+    param (
+        [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
+        [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
+        [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
+        #Return only media types with the given IDs.
+        [Parameter(Mandatory = $false, position = 3)][int]$Mediatypeids,
+        #Return only media types used by the given media.
+        [Parameter(Mandatory = $false, position = 4)][int]$Mediaids,
+        #Return only media types used by the given users.
+        [Parameter(Mandatory = $false, position = 5)][int]$Userids,
+        #Return a message_templates property with an array of media type messages.
+        [Parameter(Mandatory = $false, position = 6)][int]$SelectMessageTemplatess,
+        #Return a users property with the users that use the media type.
+        [Parameter(Mandatory = $false, position = 7)][int]$SelectUsers,
+        #Search
+        [Parameter(Mandatory = $false, position = 8)][string]$searchName,
+        [Parameter(Mandatory = $false, position = 9)][string]$searchValue,
+        [Parameter(Mandatory = $false, position = 10)][ValidateSet("True", "False")]$searchWildcardsEnabled,
+        [Parameter(Mandatory = $false, position = 11)][ValidateSet("True", "False")]$searchStart,
+        [Parameter(Mandatory = $false, position = 12)][ValidateSet("True", "False")]$searchByAny,
+        #Filter Example: -filterNameValues 'status:0,1;type:1,4' 
+        [Parameter(Mandatory = $false, position = 13)][string]$filterNameValues
+    )
+    $getMediaType = @{
+        "jsonrpc" = "2.0";
+        "method" = "mediatype.get";
+        "params" = @{
+            "output" = "extend";         
+        };
+        "auth" = $TokenApi;
+        "id" = $TokenId
+    }
+
+    #Search
+    if ($searchName) {
+        $arrValue = @()
+        foreach( $oneValue in $searchValue -split ',' ){
+            $addOneValue = ('"'+ $oneValue +'"')
+            $arrValue += $addOneValue
+        }
+
+        $searchObj = @{"$searchName" = ('['+ $($arrValue -join ',') +']') }
+        $getMediaType.params.Add("search", $searchObj)
+        }
+
+    #searchWildcardsEnabled
+    if($searchWildcardsEnabled){
+        $getMediaType.params.Add("searchWildcardsEnabled",$searchWildcardsEnabled)
+    }
+    #searchStart
+    if($searchStart){
+        $getMediaType.params.Add("startSearch",$searchStart)
+    }
+    #searchByAny
+    if($searchByAny){
+        $getMediaType.params.Add("searchByAny",$searchByAny)
+    }
+    #Filter
+    if ($filterNameValues) {
+        $hashNameValues = @{}
+        foreach( $oneObgF in $filterNameValues -split ';' ){
+            $filterName = ($oneObgF -split ":")[0]
+            $filterValue = @()
+            foreach( $oneValueF in ($($oneObgF -split ":")[1]) -split ',' ){
+                $addOneValueF = ('"'+ $oneValueF +'"')
+                $filterValue += $addOneValueF
+            }
+            $filterObj = @{"$filterName" = ('['+ $($filterValue -join ',') +']') }
+            $hashNameValues += $filterObj
+        }
+        $getMediaType.params.Add("filter", $hashNameValues)
+    }
+
+    $json = (ConvertTo-Json -InputObject $getMediaType -Compress) -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    $json
+    $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+    if($res.error){
+        return $res.error
+    }else{ return $res.result }
+}
+
+
+#########################################
 Export-ModuleMember -Function Connect-ZabbixAPI, `
 Get-HostGroupsZabbixAPI, `
 Set-HostGroupsZabbixAPI, `
@@ -2398,4 +2493,5 @@ Connect-ZabbixWEB, `
 Save-GraphZabixWEB, `
 Get-ActionZabbixAPI, `
 Get-HostInterfaceZabbixAPI, `
-Set-HostInterfaceZabbixAPI
+Set-HostInterfaceZabbixAPI, `
+Get-MediaTypeZabbixAPI
