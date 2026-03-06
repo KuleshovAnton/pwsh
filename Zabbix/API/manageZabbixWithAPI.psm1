@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.20
+#Version 1.0.0.21
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -223,6 +223,9 @@ function Get-HostsZabbixAPI {
         The search parameter will compare the beginning of fields, that is, perform a LIKE "...%" search instead. Ignored if searchWildcardsEnabled is set to True. Example: -searchHostName "Host" -searchStart $True
     .PARAMETER searchByAny
         If set to true, return results that match any of the criteria given in the filter or search parameter instead of all of them. Example: -searchByAny $True
+    .PARAMETER selectParentTemplates
+    .PARAMETER selectDashboards
+    .PARAMETER selectValueMaps
     .Example
         #Output only the hosts you are looking for (case sensitive).
         Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterHostName "host_1,host_2" | Format-Table
@@ -244,7 +247,11 @@ function Get-HostsZabbixAPI {
         #Search
         [Parameter(Mandatory = $false, position = 6)][ValidateSet("True", "False")]$searchWildcardsEnabled,
         [Parameter(Mandatory = $false, position = 7)][ValidateSet("True", "False")]$searchStart,
-        [Parameter(Mandatory = $false, position = 8)][ValidateSet("True", "False")]$searchByAny
+        [Parameter(Mandatory = $false, position = 8)][ValidateSet("True", "False")]$searchByAny,
+        #Select
+        [Parameter(Mandatory = $false, position =  9)][switch]$selectParentTemplates,
+        [Parameter(Mandatory = $false, position = 10)][switch]$selectDashboards,
+        [Parameter(Mandatory = $false, position = 11)][switch]$selectValueMaps
     )
 
     function jsonGetHostCore(){
@@ -302,6 +309,10 @@ function Get-HostsZabbixAPI {
             if($searchByAny){
                 $getHostSearch.params.Add("searchByAny",$searchByAny)
             }
+            #selectParentTemplates, selectDashboards, selectValueMapss
+            if($selectParentTemplates){ $getHostSearch.params.Add("selectParentTemplates","extend") }
+            if($selectDashboards     ){ $getHostSearch.params.Add("selectDashboards","extend") }
+            if($selectValueMaps      ){ $getHostSearch.params.Add("selectValueMaps","extend") }
             
             $json = (ConvertTo-Json -InputObject $getHostSearch) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
             $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
@@ -324,11 +335,14 @@ function Get-HostsZabbixAPI {
             $filterID = @{"hostid" = @("[$addFilterHostID]") }
             $getHost.params.Add("filter", $filterID)
         }
-
         #searchByAny
         if($searchByAny){
             $getHost.params.Add("searchByAny",$searchByAny)
         }
+        #selectParentTemplates, selectDashboards, selectValueMapss
+        if($selectParentTemplates){ $getHost.params.Add("selectParentTemplates","extend") }
+        if($selectDashboards     ){ $getHost.params.Add("selectDashboards","extend") }
+        if($selectValueMaps      ){ $getHost.params.Add("selectValueMaps","extend") }
 
         $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
         $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
