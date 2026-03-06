@@ -44,8 +44,7 @@ function Create-GrafDatasourceParameters {
         }
     return $datasourceParameters
 }
-
-################################################################################################################################################################
+#######################################################################################################################
 ###TEAMS
 #Get all Teams.
 function Get-GrafTeams {
@@ -148,8 +147,7 @@ function New-GrafTeam {
         Unix { return Invoke-RestMethod @datasourceParameters -Body $bodyJson -SkipCertificateCheck }
         }
 }
-
-################################################################################################################################################################
+#######################################################################################################################
 ###USER
 #Get all users.
 function Get-GrafUsers {
@@ -191,8 +189,12 @@ function Get-GrafUser {
         [parameter(Mandatory=$false,position=4)]$userLoginOrEmail
         )
     $credential = Convert-GrafCredential -Login $Login -Password $Password
-    if ( $userId ) {$createDatasourceUri = "$Url/api/users/$userId"}
-    else {$createDatasourceUri = "$Url/api/users/lookup?loginOrEmail=$userLoginOrEmail"}
+    if ( $userId ) {
+        $createDatasourceUri = "$Url/api/users/$userId"
+        }
+    else {
+        $createDatasourceUri = "$Url/api/users/lookup?loginOrEmail=$userLoginOrEmail"
+        }
     $datasourceParameters = Create-GrafDatasourceParameters -Method "Get" -URI $createDatasourceUri -Credential $credential
     Switch (GetOS){
         Win32NT { return Invoke-RestMethod @datasourceParameters }
@@ -222,8 +224,7 @@ function Get-GrafUserTeams {
         Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
         }
 }
-
-################################################################################################################################################################
+#######################################################################################################################
 ###DASHBOARD
 #Get Folders And Dashboards.
 function Get-GrafFoldersAndDashboards {
@@ -324,7 +325,6 @@ function Add-GrafPermissionsDashboard {
     return $return
 }
 
-################################################################################################################################################################
 #Grontend Settings
 function Get-GrafFrontendSettings {
     param(
@@ -341,7 +341,6 @@ function Get-GrafFrontendSettings {
         }
 }
 
-################################################################################################################################################################
 #Grafana Health
 function Get-GrafHealth {
     param(
@@ -357,9 +356,8 @@ function Get-GrafHealth {
         Unix { return (Invoke-RestMethod @datasourceParameters -SkipCertificateCheck) }
         }
 }
-
-################################################################################################################################################################
-#Get Organization
+#######################################################################################################################
+#Grafana Organization
 function Get-GrafOrganization {
     <#
     .SYNOPSIS
@@ -381,6 +379,7 @@ function Get-GrafOrganization {
         #Get Users in Organization
         [parameter(Mandatory=$false,position=7)][int]$usersInOrgId
         )
+
     $credential = Convert-GrafCredential -Login $Login -Password $Password
 
     #Get current Organization
@@ -398,39 +397,56 @@ function Get-GrafOrganization {
         Unix { return Invoke-RestMethod @datasourceParameters -SkipCertificateCheck }
         }
 }
-
-#Set Organization 
 function Set-GrafOrganization {
     <#
     .SYNOPSIS
         Grafana Function Change Organization.
+    .PARAMETER Type
+        Add=    Method POST   /api/orgs/:orgId/users/:userId
+        Update= Method PATCH  /api/orgs/:orgId/users/:userId
+        Delete= Method DELETE /api/orgs/:orgId/users/:userId
     .EXAMPLE
-        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -addUserOrgId 3 -addUserI 45 -addUserRole Editor
+        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type Add -UserOrgId 3 -UserId 45 -UserRole Editor
+    .EXAMPLE
+        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type Update -UserOrgId 3 -UserId 45 -UserRole Viewer
+    .EXAMPLE
+        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type DELETE -UserOrgId 3 -UserId 45
     #>
     param(
         [parameter(Mandatory=$true,position=0)]$Login,
         [parameter(Mandatory=$true,position=1)]$Password,
         [parameter(Mandatory=$true,position=2)]$Url,
-        [parameter(Mandatory=$false,position=3)]$addUserOrgId,
-        [parameter(Mandatory=$false,position=4)]$addUserId,
-        #Admin — управление пользователями, datasource, dashboards. #Editor — создание/редактирование dashboards. #Viewer — только просмотр.
-        [parameter(Mandatory=$false,position=5)][ValidateSet("Admin","Editor","Viewer")]$addUserRole
-        )
+        [parameter(Mandatory=$true,position=3)][ValidateSet("Add","Update","Delete")]$Type,
+        [parameter(Mandatory=$true,position=4)]$UserOrgId,
+        [parameter(Mandatory=$true,position=5)]$UserId,
+        #Admin — manage users, datasource, dashboards. #Editor — create/set dashboards. #Viewer — only view.
+        [parameter(Mandatory=$false,position=6)][ValidateSet("Admin","Editor","Viewer")]$UserRole
+    )
+
+    switch($Type){
+        "Add"    {$methodUrl = "POST"}
+        "Update" {$methodUrl = "PATCH"}
+        "Delete" {$methodUrl = "DELETE"}
+    }
+
     $credential = Convert-GrafCredential -Login $Login -Password $Password
-    if($addUserOrgId){
-        $createDatasourceUri = "$Url/api/orgs/$addUserOrgId/users/$addUserId"
-        $body = @{
-            "role"= $addUserRole
-        }
+    if($UserOrgId){
+        $createDatasourceUri = "$Url/api/orgs/$UserOrgId/users/$UserId"
+        #If the url type method is not DELETE.
+        if($Type -notlike "Delete"){ 
+            $body = @{ "role"= $UserRole } 
+            }
         $bodyJson = (ConvertTo-Json $body -Compress) -replace "\s\s+"
     }
-    $datasourceParameters = Create-GrafDatasourceParameters -Method "POST" -URI $createDatasourceUri -Credential $credential
+    
+    $datasourceParameters = Create-GrafDatasourceParameters -Method $methodUrl -URI $createDatasourceUri -Credential $credential
     Switch (GetOS){
         Win32NT { return Invoke-RestMethod @datasourceParameters -Body $bodyJson }
         Unix { return Invoke-RestMethod @datasourceParameters -Body $bodyJson -SkipCertificateCheck }
-        }
+    }
 }
 
+#######################################################################################################################
 Export-ModuleMember -Function Get-GrafTeams, `
 Get-GrafTeamMembers, `
 Add-GrafTeamMembers, `
