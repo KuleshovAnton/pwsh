@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.5
+#Version 1.0.0.6
 #OS Platform
 function GetOS {
     if ( $PSVersionTable.PSVersion.Major -le "5" ) {   
@@ -402,15 +402,18 @@ function Set-GrafOrganization {
     .SYNOPSIS
         Grafana Function Change Organization.
     .PARAMETER Type
-        Add=    Method POST   /api/orgs/:orgId/users/:userId
+        Add=    Method POST   /api/orgs/:orgId/users
         Update= Method PATCH  /api/orgs/:orgId/users/:userId
         Delete= Method DELETE /api/orgs/:orgId/users/:userId
     .EXAMPLE
-        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type Add -UserOrgId 3 -UserId 45 -UserRole Editor
+        #Add a user to an organization.
+        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type Add -UserOrgId 2 -loginOrEmai "User@local" -UserRole Editor
     .EXAMPLE
+        #Update a user in an organization.
         Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type Update -UserOrgId 3 -UserId 45 -UserRole Viewer
     .EXAMPLE
-        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type DELETE -UserOrgId 3 -UserId 45
+        #Remove a user from an organization.
+        Set-GrafOrganization -Login foo -Password foo -Url "http://_IP_or_DNS_:Port" -Type Delete -UserOrgId 3 -UserId 45
     #>
     param(
         [parameter(Mandatory=$true,position=0)]$Login,
@@ -418,32 +421,63 @@ function Set-GrafOrganization {
         [parameter(Mandatory=$true,position=2)]$Url,
         [parameter(Mandatory=$true,position=3)][ValidateSet("Add","Update","Delete")]$Type,
         [parameter(Mandatory=$true,position=4)]$UserOrgId,
-        [parameter(Mandatory=$true,position=5)]$UserId,
+        [parameter(Mandatory=$false,position=5)][int]$UserId,
+        [parameter(Mandatory=$false,position=6)][string]$loginOrEmail,
         #Admin — manage users, datasource, dashboards. #Editor — create/set dashboards. #Viewer — only view.
         [parameter(Mandatory=$false,position=6)][ValidateSet("Admin","Editor","Viewer")]$UserRole
     )
 
     switch($Type){
         "Add"    {$methodUrl = "POST"}
-        "Update" {$methodUrl = "PATCH"}
-        "Delete" {$methodUrl = "DELETE"}
-    }
+        "Update" {$methodUrl = "Patch"}
+        "Delete" {$methodUrl = "Delete"}
+        }
+
+    switch($UserRole){
+        "Admin" { $role = 'Admin' }
+        "Editor"{ $role = 'Editor'}
+        "Viewer"{ $role = 'Viewer'}
+        }
 
     $credential = Convert-GrafCredential -Login $Login -Password $Password
     if($UserOrgId){
-        $createDatasourceUri = "$Url/api/orgs/$UserOrgId/users/$UserId"
-        #If the url type method is not DELETE.
-        if($Type -notlike "Delete"){ 
-            $body = @{ "role"= $UserRole } 
+        if($Type -eq "Add"){
+            $body = @{ 
+                "role"= $role ; 
+                "loginOrEmail" = $loginOrEmail 
+                }
+            $createDatasourceUri = "$Url/api/orgs/$UserOrgId/users"
+            }
+        if($Type -eq "Update"){
+            $body = @{ "role"= $role }
+            $createDatasourceUri = "$Url/api/orgs/$UserOrgId/users/$UserId"
+            $loginOrEmail = $null
+            }
+        if($Type -eq "Delete"){
+            $body = ''
+            $createDatasourceUri = "$Url/api/orgs/$UserOrgId/users/$UserId"
+            $loginOrEmail = $null
             }
         $bodyJson = (ConvertTo-Json $body -Compress) -replace "\s\s+"
     }
     
     $datasourceParameters = Create-GrafDatasourceParameters -Method $methodUrl -URI $createDatasourceUri -Credential $credential
+    
+    $arrObj = @()
+    $obj = New-Object System.Object
+
     Switch (GetOS){
-        Win32NT { return Invoke-RestMethod @datasourceParameters -Body $bodyJson }
-        Unix { return Invoke-RestMethod @datasourceParameters -Body $bodyJson -SkipCertificateCheck }
+        Win32NT { $setGrafOrg = Invoke-RestMethod @datasourceParameters -Body $bodyJson }
+        Unix { $setGrafOrg =  Invoke-RestMethod @datasourceParameters -Body $bodyJson -SkipCertificateCheck }
     }
+
+    $obj | Add-Member -Type NoteProperty -Name loginOrEmail -Value $loginOrEmail
+    $obj | Add-Member -Type NoteProperty -Name message -Value $setGrafOrg.message
+    if($Type -notlike 'Add'){ $messageId = $UserId}
+    else{ $messageId = $setGrafOrg.userId }
+    $obj | Add-Member -Type NoteProperty -Name userid -Value $messageId
+    $arrObj += $obj
+    return $arrObj
 }
 
 #######################################################################################################################
