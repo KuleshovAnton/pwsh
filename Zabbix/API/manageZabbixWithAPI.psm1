@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.21
+#Version 1.0.0.23
 #Connect and Autorization to Zabbix API.
 function Connect-ZabbixAPI {
     <#
@@ -130,7 +130,7 @@ function Get-HostGroupsZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function Set-HostGroupsZabbixAPI {
     <#
     .SYNOPSIS
@@ -224,8 +224,13 @@ function Get-HostsZabbixAPI {
     .PARAMETER searchByAny
         If set to true, return results that match any of the criteria given in the filter or search parameter instead of all of them. Example: -searchByAny $True
     .PARAMETER selectParentTemplates
+        Return a parentTemplates property with templates that the host is linked to.
     .PARAMETER selectDashboards
+        Return a dashboards property.
     .PARAMETER selectValueMaps
+        Return a valuemaps property with host value maps.
+    .PARAMETER groupids
+        Return only hosts that belong to the given groups.
     .Example
         #Output only the hosts you are looking for (case sensitive).
         Get-HostsZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi Paste_Token_API -TokenId 2 -filterHostName "host_1,host_2" | Format-Table
@@ -244,14 +249,15 @@ function Get-HostsZabbixAPI {
         [Parameter(Mandatory = $false, position = 3)][string]$filterHostName,
         [Parameter(Mandatory = $false, position = 4)][string]$searchHostName,
         [Parameter(Mandatory = $false, position = 5)][string]$filterHostID,
+        [Parameter(Mandatory = $false, position = 6)][string]$groupids,
         #Search
-        [Parameter(Mandatory = $false, position = 6)][ValidateSet("True", "False")]$searchWildcardsEnabled,
-        [Parameter(Mandatory = $false, position = 7)][ValidateSet("True", "False")]$searchStart,
-        [Parameter(Mandatory = $false, position = 8)][ValidateSet("True", "False")]$searchByAny,
+        [Parameter(Mandatory = $false, position = 7)][ValidateSet("True", "False")]$searchWildcardsEnabled,
+        [Parameter(Mandatory = $false, position = 8)][ValidateSet("True", "False")]$searchStart,
+        [Parameter(Mandatory = $false, position = 9)][ValidateSet("True", "False")]$searchByAny,
         #Select
-        [Parameter(Mandatory = $false, position =  9)][switch]$selectParentTemplates,
-        [Parameter(Mandatory = $false, position = 10)][switch]$selectDashboards,
-        [Parameter(Mandatory = $false, position = 11)][switch]$selectValueMaps
+        [Parameter(Mandatory = $false, position = 10)][switch]$selectParentTemplates,
+        [Parameter(Mandatory = $false, position = 11)][switch]$selectDashboards,
+        [Parameter(Mandatory = $false, position = 12)][switch]$selectValueMaps
     )
 
     function jsonGetHostCore(){
@@ -335,23 +341,29 @@ function Get-HostsZabbixAPI {
             $filterID = @{"hostid" = @("[$addFilterHostID]") }
             $getHost.params.Add("filter", $filterID)
         }
-        #searchByAny
+        #SearchByAny
         if($searchByAny){
             $getHost.params.Add("searchByAny",$searchByAny)
         }
-        #selectParentTemplates, selectDashboards, selectValueMapss
+        #Select ParentTemplates, Dashboards, ValueMapss
         if($selectParentTemplates){ $getHost.params.Add("selectParentTemplates","extend") }
         if($selectDashboards     ){ $getHost.params.Add("selectDashboards","extend") }
         if($selectValueMaps      ){ $getHost.params.Add("selectValueMaps","extend") }
 
-        $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+        #Filter hostsId.
+        if ($groupids) {
+            $addFilterGrpID = filterListPreparation($groupids)
+            $getHost.params.Add("groupids", @($addFilterGrpID) )
+        }
+
+        $json = (ConvertTo-Json -InputObject $getHost) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
         $res = Invoke-RestMethod -Method 'Post' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
         if($res.error){
             return $res.error
         }else{ return $res.result }
     }
 }
-
+#
 function New-HostZabbixAPI {
     <#
     .SYNOPSIS
@@ -674,7 +686,7 @@ function New-HostZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function Remove-HostsZabbixAPI {
     <#
     .Example
@@ -705,30 +717,106 @@ function Remove-HostsZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-<#In Developer
-#Massadd Host to Zabbix API _v1
-function Add-HostsZabbixAPI {
-
-    param(
+#
+function Set-HostZabbixAPI {
+    <#
+    .SYNOPSIS
+        The hostid property must be defined for each network node, and all other properties are optional. Only the specified properties will be updated, and all other properties will remain unchanged.
+        Please note that updating the technical name of a network node will also update the visible name of the network node (if it is not set or specified) to the value of the technical name.
+        Unlike the Zabbix web interface, where the name (visible name of the network node) matches the host (technical name of the network node), updating the host through the API will not automatically update the name. Both properties must be updated directly.
+    .PARAMETER HostName
+        Technical name of the host..
+    .PARAMETER HostVisibleName
+        Visible name of the host..
+    .PARAMETER Descriptio
+        Description of the host.
+    .PARAMETER InventoryMode
+        Host inventory population mode. Possible values are:
+        -1- (default) disabled; 
+        0 - manual; 
+        1 - automatic
+    .PARAMETER ProxyHostId
+        ID of the proxy that is used to monitor the host.
+    .PARAMETER Status
+        Status and function of the host. Possible values are:
+        0 - (default) monitored host; 
+        1 - unmonitored host.
+    .PARAMETER $InterfaceJSON
+        Return a parentTemplates property with templates that the host is linked to.
+        {
+            "interfaceid":"",   #!!!Required parameter: ID of the interface.
+            "main":"",          #Possible values are: 0 - not default; 1 - default.
+            "useip":"",         #Possible values are: 0 - connect using host DNS name; 1 - connect using host IP address for this host interface.
+            "ip":"",            #IP address used by the interface.
+            "dns":"",           #DNS name used by the interface.
+            "port":""           #Port number used by the interface. Can contain user macros.
+        }
+    .Example
+        Set-HostZabbixAPI -UrlApi $apiUrl -TokenApi $token.result -TokenId $token.id -HostsID 87539 -HostName 'host1.domain.local' -Status Disable -InterfaceJSON '{"interfaceid":"80580","ip":"192.168.0.2","dns":"host2.domain.local"}' -WhatIf Falsele
+    #>    
+    param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
         [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
         [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
-        [Parameter(Mandatory = $true, position = 3)][int]$HostID
+        [Parameter(Mandatory = $true, position = 3)][int]$HostsId,
+        #Property
+        [Parameter(Mandatory = $false, position = 4)][string]$HostName,
+        [Parameter(Mandatory = $false, position = 5)][string]$HostVisibleName,
+        [Parameter(Mandatory = $false, position = 6)][string]$Description,
+        [Parameter(Mandatory = $false, position = 7)][ValidateSet('Disable','Manual','Auto')]$InventoryMode,
+        [Parameter(Mandatory = $false, position = 8)][int]$ProxyHostId,
+        [Parameter(Mandatory = $false, position = 9)][ValidateSet('Enable','Disable')]$Status,
+        [Parameter(Mandatory = $false, position = 9)][string]$InterfaceJSON,
+        [Parameter(Mandatory = $false, position= 10)][ValidateSet($True, $False)]$WhatIf = $False
     )
 
-    $massAddHosts = @{
+    $updateHost = @{
         "jsonrpc" = "2.0";
-        "method"  = "host.massadd";
+        "method"  = "host.update";
         "params"  = @{
+            "hostid" = $HostsId;
         };
         "auth"    = $TokenApi;
         "id"      = $TokenId;
     }
 
+    #Please note that updating the technical name of a network node will also update the visible name of the network node (if it is not set or specified) to the value of the technical name.
+    #Change Host Name.
+    if($HostName){$updateHost.params.Add("host",$HostName)}
+    #Change Host Visible Name.
+    if($HostVisibleName){$updateHost.params.Add("name",$HostVisibleName)}
+    if($Description){$updateHost.params.Add("description",$Description)}
+    if($InventoryMode){
+        switch ($InventoryMode) {
+            'Disable'{ $InventoryModeJ ='-1'}
+            'Manual' { $InventoryModeJ = '0' }
+            'Auto'   { $InventoryModeJ = '1' }
+        }
+        $updateHost.params.Add("inventory_mode",$InventoryModeJ)
+    }
+    if($ProxyHostId){$updateHost.params.Add("proxy_hostid",$ProxyHostId)}
+    if($Status){
+        switch ($Status) {
+            'Enable' { $StatusJ = '0' }
+            'Disable'{ $StatusJ = '1' }
+        }
+        $updateHost.params.Add("status",$StatusJ)
+    }
+    if($InterfaceJSON){
+        $updateHost.params.Add("interfaces",@($InterfaceJSON))
+    }
 
+    $json = (ConvertTo-Json -InputObject $updateHost -Compress) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '"{', '{' -replace '}"','}'
+    #WhatIf
+    if($WhatIf -eq $true){
+        $json 
+    }else {
+        $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
+        if($res.error){
+            return $res.error
+        }else{ return $res.result }
+    }
 }
-#>
-
 #########################################
 #Get all Template Zabbix API
 function Get-TemplateZabbixAPI {
@@ -743,7 +831,8 @@ function Get-TemplateZabbixAPI {
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
         [Parameter(Mandatory = $true, position = 1)][string]$TokenApi,
         [Parameter(Mandatory = $true, position = 2)][int]$TokenId,
-        [Parameter(Mandatory = $false, position = 3)][array]$filterTemplateName
+        [Parameter(Mandatory = $false, position = 3)][array]$filterTemplateName,
+        [Parameter(Mandatory = $false, position = 4)][array]$templateIds
     )
     $getTemplate = @{
         "jsonrpc" = "2.0";
@@ -765,13 +854,22 @@ function Get-TemplateZabbixAPI {
         $filterName = @{"host" = @("[$addTm]") }
         $getTemplate.params.Add("filter", $filterName)
     }
-    $json = (ConvertTo-Json -InputObject $getTemplate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']'
+    if($templateIds){
+        $arrTmID = @()
+        foreach ( $oneTmID in ($templateIds -split ",") ) {
+            $oneResTmID = ('"' + $oneTmID + '"')
+            $arrTmID += $oneResTmID
+        }
+        $addTmID = $arrTmID -join ","
+        $getTemplate.params.Add("templateids", @($addTmID))
+    }
+
+    $json = (ConvertTo-Json -InputObject $getTemplate) -replace "\\r\\n" -replace "\\" -replace "\s\s+" -replace '"\[', '[' -replace '\]"', ']' -replace '""','"'
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     if($res.error){
         return $res.error
     }else{ return $res.result }
 }
-
 #########################################
 #Working with Users Groups Zabbix API.
 function Get-UserGroupZabbixAPI {
@@ -838,7 +936,7 @@ function Get-UserGroupZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function New-UserGroupZabbixAPI {
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
@@ -870,7 +968,7 @@ function New-UserGroupZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function Set-UserGroupZabbixAPI {
     <#
     .SYNOPSIS
@@ -994,7 +1092,6 @@ function Set-UserGroupZabbixAPI {
         }else{ return $res.result }
     }
 }
-
 #########################################
 #Working with Users Zabbix API.
 function Get-UserZabbixAPI {
@@ -1061,7 +1158,7 @@ function Get-UserZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function New-UserZabbixAPI {
     <#
     .SYNOPSIS
@@ -1123,7 +1220,7 @@ function New-UserZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function Remove-UserZabbixAPI {
     <#
     .SYNOPSIS
@@ -1160,7 +1257,7 @@ function Remove-UserZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function Set-UserZabbixAPI {
     <#
     .SYNOPSIS
@@ -1295,7 +1392,6 @@ function Get-UserRoleZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
 #########################################
 #Working with Maintenance Zabbix API.
 function Get-MaintenanceZabbixAPI {
@@ -1415,7 +1511,7 @@ function Get-MaintenanceZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function New-MaintenanceZabbixAPI {
     <#
     .SYNOPSIS
@@ -1556,7 +1652,7 @@ function New-MaintenanceZabbixAPI {
             }else{ return $res.result }
         }
 }
-
+#
 function Set-MaintenanceZabbixAPI {
     <#
     .SYNOPSIS
@@ -1714,7 +1810,7 @@ function Set-MaintenanceZabbixAPI {
         }else{ return $res.result }
     }
 }
-
+#
 function Remove-MaintenanceZabbixAPI {
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
@@ -1738,7 +1834,6 @@ function Remove-MaintenanceZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
 #########################################
 #Working with Item Zabbix API.
 function New-ItemZabbixAPI {
@@ -1798,7 +1893,7 @@ function New-ItemZabbixAPI {
     $res = Invoke-RestMethod -Method 'POST' -Uri $urlApi -Body $json -ContentType "application/json;charset=UTF-8"
     return $res.result
 }
-
+#
 function Get-ItemZabbixAPI {
     <#
     .SYNOPSIS
@@ -1898,7 +1993,6 @@ function Get-ItemZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
 #########################################
 #Working with Trigger Zabbix API.
 function New-TriggerZabbixAPI {
@@ -1932,7 +2026,7 @@ function New-TriggerZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
+#
 function Get-TriggerZabbixAPI{
     <#
     .SYNOPSIS
@@ -2070,7 +2164,6 @@ function Get-TriggerZabbixAPI{
         return $res.error
     }else{ return $res.result }
 }
-
 #########################################
 #Work with Graph Zabbix API.
 function Get-GraphZabbixAPI {
@@ -2195,7 +2288,6 @@ function Save-GraphZabixWEB {
     }
     Invoke-WebRequest -Method Post -Uri $imgUrlJoin -WebSession $WebSession -UserAgent Chrome -OutFile $imgSave
 }
-
 #########################################
 #Work with Action Zabbix API.
 function Get-ActionZabbixAPI {
@@ -2253,7 +2345,6 @@ function Get-ActionZabbixAPI {
         return $res.error
     }else{ return $res.result }
 }
-
 #########################################
 #Working with hosts interface Zabbix API.
 function Get-HostInterfaceZabbixAPI{
@@ -2318,7 +2409,6 @@ function Get-HostInterfaceZabbixAPI{
         return $res.result
     }
 }
-
 #Host update Interface Zabbix API.
 function Set-HostInterfaceZabbixAPI{
 
@@ -2400,7 +2490,6 @@ function Set-HostInterfaceZabbixAPI{
         return $res.error
     }else{ return $res.result }
 }
-
 #########################################
 #Working withMedia type Zabbix API.
 function Get-MediaTypeZabbixAPI {
@@ -2485,7 +2574,6 @@ function Get-MediaTypeZabbixAPI {
     }else{ return $res.result }
 }
 
-
 #########################################
 Export-ModuleMember -Function Connect-ZabbixAPI, `
 Get-HostGroupsZabbixAPI, `
@@ -2493,7 +2581,7 @@ Set-HostGroupsZabbixAPI, `
 Get-HostsZabbixAPI, `
 New-HostZabbixAPI, `
 Remove-HostsZabbixAPI, `
-#Massdd-HostsZabbixAPI
+Set-HostZabbixAPI, `
 Get-TemplateZabbixAPI, `
 Get-UserGroupZabbixAPI, `
 New-UserGroupZabbixAPI, `
