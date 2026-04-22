@@ -1,8 +1,8 @@
 #!/bin/pwsh
 
-#Version 1.0.0.6
+#Version 1.0.0.8
 #OS Platform
-function GetOS {
+function global:GetOS {
     if ( $PSVersionTable.PSVersion.Major -le "5" ) {   
         return $Platform = "Win32NT"
         }
@@ -15,7 +15,7 @@ function GetOS {
 }
 
 #Credential
-function Convert-GrafCredential{
+function global:Convert-GrafCredential{
     <#
     .SYNOPSIS
         Function for converting plain text authentication informations to base 64
@@ -30,7 +30,7 @@ function Convert-GrafCredential{
 }
 
 #DatasourceParameters
-function Create-GrafDatasourceParameters {
+function global:Create-GrafDatasourceParameters {
     param(
         [parameter(Mandatory=$true,position=0)]$Method,
         [parameter(Mandatory=$true,position=1)]$URI,
@@ -481,7 +481,10 @@ function Set-GrafOrganization {
 }
 
 #######################################################################################################################
-Export-ModuleMember -Function Get-GrafTeams, `
+Export-ModuleMember -Function GetOS, `
+Convert-GrafCredential, `
+Create-GrafDatasourceParameter, `
+Get-GrafTeams, `
 Get-GrafTeamMembers, `
 Add-GrafTeamMembers, `
 New-GrafTeam, `
