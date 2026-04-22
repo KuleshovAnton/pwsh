@@ -741,7 +741,7 @@ function Set-HostZabbixAPI {
         Status and function of the host. Possible values are:
         0 - (default) monitored host; 
         1 - unmonitored host.
-    .PARAMETER $InterfaceJSON
+    .PARAMETER InterfaceJSON
         Return a parentTemplates property with templates that the host is linked to.
         {
             "interfaceid":"",   #!!!Required parameter: ID of the interface.
@@ -752,7 +752,7 @@ function Set-HostZabbixAPI {
             "port":""           #Port number used by the interface. Can contain user macros.
         }
     .Example
-        Set-HostZabbixAPI -UrlApi $apiUrl -TokenApi $token.result -TokenId $token.id -HostsID 87539 -HostName 'host1.domain.local' -Status Disable -InterfaceJSON '{"interfaceid":"80580","ip":"192.168.0.2","dns":"host2.domain.local"}' -WhatIf Falsele
+        Set-HostZabbixAPI -UrlApi 'http://IP_or_FQDN/zabbix/api_jsonrpc.php' -TokenApi 'Created_by_you_Token' -TokenId 'Created_by_you__id' -HostsId 87539 -HostName 'host1.domain.local' -Status Disable -InterfaceJSON '{"interfaceid":"80580","ip":"192.168.0.2","dns":"host2.domain.local"}' -WhatIf False
     #>    
     param (
         [Parameter(Mandatory = $true, position = 0)][string]$UrlApi,
