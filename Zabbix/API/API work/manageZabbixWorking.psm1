@@ -1,6 +1,6 @@
 #!/bin/pwsh
 
-#Version 1.0.0.11
+#Version 1.0.0.15
 
 ##################################################################################
 #Used Monitoring.
@@ -16,13 +16,49 @@ function Get-HostUsedMonitoring{
         API token id для подключения к Zabbix API. Example: -apiTokenId 132
     .PARAMETER searchHostName
         Поиск объектов. Example -searchHostName "findHost1,findHost2,etc"
+    .PARAMETER compareObjMon
+        Сравниваем объекты из массива список хостов для поиска и найденых объектов на мониторинге в Zabbix.
+    .PARAMETER checkDns
+        Проверка A и PTR записи на DNS сервере.
     #>
-        param(
+    param(
         [Parameter(Mandatory=$true,position=1)][Alias('UrlApi')][string]$apiUrl,
         [Parameter(Mandatory=$true,position=2)][Alias('TokenApi')][string]$apiTokenResult,
         [Parameter(Mandatory=$true,position=3)][Alias('TokenId')][int]$apiTokenId,
-        [Parameter(Mandatory=$true,position=4)][string]$searchHostName
+        [Parameter(Mandatory=$true,position=4)][string]$searchHostName,
+        [Parameter(Mandatory=$false,position=5)][ValidateSet($true,$false)]$compareObjMon,
+        [Parameter(Mandatory=$false,position=6)][ValidateSet($true,$false)]$checkDns
     )
+
+    function nslookupA($oneHost){
+        #Find DNS resolve A.
+        $objIp = New-Object System.Object
+        $dns = Resolve-DnsName $oneHost -Type A -ErrorAction Ignore
+        if($dns){
+            $objIp | Add-Member -type NoteProperty -name dnsName -Value $dns.name
+            $objIp | Add-Member -type NoteProperty -name dnsIP -Value $dns.IPAddress  
+        }else{
+            $objIp | Add-Member -type NoteProperty -name dnsName -Value $null
+            $objIp | Add-Member -type NoteProperty -name dnsIP -Value $null
+        }
+        Start-Sleep -Seconds 1
+        return $objIp
+    }
+
+    function nslookupPtr($oneHostIP){
+        #Find DNS resolve PTR.
+        $objIp = New-Object System.Object
+        $dns = Resolve-DnsName $oneHostIP -Type PTR -ErrorAction Ignore
+        if($dns){
+            $objIp | Add-Member -type NoteProperty -name dnsName -Value $dns.NameHost
+            $objIp | Add-Member -type NoteProperty -name dnsIP -Value ( -join ($dns.Name.Replace(".in-addr.arpa","").Split('.')[3..0] -join '.') )
+        }else{
+            $objIp | Add-Member -type NoteProperty -name dnsName -Value $null
+            $objIp | Add-Member -type NoteProperty -name dnsIP -Value $null
+        }
+        Start-Sleep -Seconds 1
+        return $objIp
+    }
 
     #Zabbix Search host (case-insensitive)
     $searchHostf = Get-HostsZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -searchHostName $searchHostName
@@ -31,14 +67,14 @@ function Get-HostUsedMonitoring{
         $searchInterface = Get-HostInterfaceZabbixAPI -UrlApi $apiUrl -TokenApi $apiTokenResult -TokenId $apiTokenId -Hostid $searchHostOne.hostid
         
         switch($searchHostOne.status){
-            0 { $status = 'monitored'}
-            1 { $status = 'unmonitored'}
+            0 { $status = 'monitored' }
+            1 { $status = 'unmonitored' }
         }
 
         switch($searchInterface.available){
-            0{$available = '0-default'}
-            1{$available = '1-available'}
-            2{$available = '2-unavailable'}
+            0 { $available = '0-default' }
+            1 { $available = '1-available' }
+            2 { $available = '2-unavailable' }
         }
 
         $objHosts = New-Object System.Object
@@ -50,22 +86,97 @@ function Get-HostUsedMonitoring{
         $objHosts | Add-Member -Type NoteProperty -Name ip -Value $searchInterface.ip
         $objHosts | Add-Member -Type NoteProperty -Name available -Value $available
         $objHosts | Add-Member -Type NoteProperty -Name error -Value $searchInterface.error
-        $objHosts | Add-Member -Type NoteProperty -Name groups -Value $searchHostOne.groups.name
-        $searchHostArr += $objHosts
-    }
-    Write-Host "--Object beging monitored in Zabbix. Total: $($searchHostArr.Count) " -ForegroundColor Green
-    $searchHostArr | Sort-Object host | Format-Table
+        
+        #For checkDns.
+        if( $checkDns -eq $true ){
+            $mainInterface = $searchInterface | Where-Object { $_.main -eq '1' }
 
-    #Сравниваем объекты из массива список хостов для поиска "$arrрHosts" и найденых объектов на мониторинге в Zabbix "$searchHost"
-    #Вывод хостов не обнаруженных стоящими на мониоринге в Zabbix согласно списку хостов для поиска.
-    Write-Host "--Object NOT beging monitored in Zabbix." -ForegroundColor Red
-    if($searchHostf){
-        $compareHostf = (Compare-Object -ReferenceObject $($searchHostName -split ",") -DifferenceObject $searchHostf.host | Where-Object {$_.SideIndicator -eq "<="}).InputObject
-        $compareHostf
-    } else {
-        $compareHostf = ($arrHostsf -split ",")
-        $compareHostf
+            #Use main = (1-default), useip = (0-using host DNS name)
+            if( $mainInterface | Where-Object { $_.useip -eq '0' } ){
+                $findCheckDns = nslookupA( ($mainInterface.dns | Select-Object -Unique) )
+
+                if($null -ne $findCheckDns){
+                    $diffObj = $findCheckDns.dnsIP
+                }else{ 
+                    $diffObj = @() 
+                }
+
+                if($diffObj){
+                    $compareDNS = (Compare-Object -ReferenceObject $mainInterface.ip -DifferenceObject $diffObj -IncludeEqual | Where-Object { $_.SideIndicator -eq '==' -or $_.SideIndicator -eq '=>' }).SideIndicator
+                }else{
+                    if( $diffObj | Where-Object { $_ -in ($mainInterface.ip | Select-Object -Unique ) } ){
+                        $compareDNS = '=='
+                    }else{ $compareDNS = '=>' }
+                }
+
+                #if( $diffObj | Where-Object { $_ -in ($mainInterface.ip | Select-Object -Unique ) } ){
+                #    $compareDNS = '=='
+                #}else{ $compareDNS = '=>' }
+                
+                $useDNS = 'DNS-IP'
+                $useRealIp = $diffObj
+            }
+            #Use main = (1-default), useip = (1-using host IP address)
+            if( $mainInterface | Where-Object { $_.useip -eq '1' } ){
+                $findCheckDns = nslookupPtr( ($mainInterface.ip | Select-Object -Unique) )
+
+                #Determine a non-zero value for DNS name verification using PTR
+                if($null -ne $findCheckDns){
+                    $diffObj = $findCheckDns.dnsName
+                    $realIp = $findCheckDns.dnsIP
+                }else{ 
+                    $diffObj = @()
+                    $realIp = @()
+                }
+
+                #List of possible desired values
+                $listHostName = @(
+                    $mainInterface.dns,
+                    $searchHostOne.host,
+                    $searchHostOne.name
+                )
+
+                #If the DNS name of the PTR record contains one of the possible matches $listHostName
+                if( $diffObj | Where-Object { $_ -in ($listHostName | Select-Object -Unique ) } ){
+                    $compareDNS = '=='
+                }else{ $compareDNS = '=>' }
+
+                $useDNS = 'IP-DNS'
+                $useRealIp = $realIp
+            }
+
+            if( $compareDNS ){
+                $resultCompareDNS = ($useDNS +' '+ $compareDNS)
+            }else{ $resultCompareDNS = $null }
+
+            $objHosts | Add-Member -Type NoteProperty -Name 'DNS\IP' -Value $resultCompareDNS
+            $objHosts | Add-Member -Type NoteProperty -Name 'realIP' -Value $useRealIp 
         }
+
+        $objHosts | Add-Member -Type NoteProperty -Name groups -Value $searchHostOne.groups.name
+        $searchHostArr += $objHosts    
+    }
+    
+   
+    if( $compareObjMon -eq $true ){
+        Write-Host "--Object beging monitored in Zabbix. Total: $($searchHostArr.Count) " -ForegroundColor Green
+        $searchHostArr | Sort-Object host | Format-Table
+    }else{
+        $searchHostArr | Sort-Object host
+    }
+
+    if( $compareObjMon -eq $true ){
+        #Сравниваем объекты из массива список хостов для поиска "$arrрHosts" и найденых объектов на мониторинге в Zabbix "$searchHost"
+        #Вывод хостов не обнаруженных стоящими на мониоринге в Zabbix согласно списку хостов для поиска.
+        Write-Host "--Object NOT beging monitored in Zabbix." -ForegroundColor Red
+        if($searchHostf){
+            $compareHostf = (Compare-Object -ReferenceObject $($searchHostName -split ",") -DifferenceObject $searchHostf.host | Where-Object {$_.SideIndicator -eq "<="}).InputObject
+            $compareHostf
+        } else {
+            $compareHostf = ($arrHostsf -split ",")
+            $compareHostf
+        }
+    }
 }
 ##################################################################################
 #Export Template\Host item and trigger configuration.
